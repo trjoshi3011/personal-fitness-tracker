@@ -1,26 +1,87 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Warmer, slightly dimmed base — easier on the eyes than paper-bright cream */
+  --background: #e9e2d4;
+  --foreground: #1c1917;
+  --card: rgba(255, 252, 248, 0.72);
+  --card-foreground: #1c1917;
+  --muted: #ddd2c4;
+  --muted-foreground: #6b6560;
+  --border: rgba(120, 53, 15, 0.12);
+  --ring: rgba(202, 138, 4, 0.4);
+  --accent: #b45309;
+  --accent-foreground: #fff7ed;
+  --radius: 16px;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+::selection {
+  background: rgba(234, 179, 8, 0.22);
+}
+
+/* Layered gold / honey / brass — warm, less orange */
+.dashboard-bg {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(
+      ellipse 140% 90% at 50% -12%,
+      rgba(255, 165, 0, 0.38),
+      transparent 58%
+    ),
+    radial-gradient(
+      1100px 720px at 6% 20%,
+      rgba(255, 165, 0, 0.38),
+      transparent 52%
+    ),
+    radial-gradient(
+      1000px 680px at 94% 16%,
+      rgba(255, 165, 0, 0.38),
+      transparent 54%
+    ),
+    radial-gradient(
+      780px 520px at 50% 44%,
+      rgba(255, 165, 0, 0.38),
+      transparent 66%
+    ),
+    radial-gradient(
+      1200px 820px at 48% 108%,
+      rgba(146, 110, 36, 0.24),
+      transparent 58%
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(254, 249, 231, 0.5) 0%,
+      transparent 44%,
+      rgba(253, 230, 138, 0.1) 100%
+    );
+}
+
+.dashboard-grid {
+  background-image:
+    linear-gradient(to right, rgba(120, 90, 30, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(120, 90, 30, 0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(circle at 35% 12%, black 0%, transparent 74%);
+  opacity: 0.85;
 }

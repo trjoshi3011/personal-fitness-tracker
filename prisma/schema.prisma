@@ -1,0 +1,316 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Provider {
+  FITBIT
+  STRAVA
+}
+
+enum SyncStatus {
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  passwordHash String
+  name      String?
+  timezone  String   @default("UTC")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  connectedAccounts   ConnectedAccount[]
+  dailyFitbitStats         DailyFitbitStat[]
+  fitbitActivityLogs       FitbitActivityLog[]
+  stravaActivities         StravaActivity[]
+  derivedDailyMetrics      DerivedDailyMetric[]
+  syncLogs                 SyncLog[]
+  sessions                 Session[]
+  monthlyFitnessSnapshots  MonthlyFitnessSnapshot[]
+
+  @@index([createdAt])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+
+  // Store a hash of the session token (never store raw token).
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model ConnectedAccount {
+  id        String   @id @default(cuid())
+  userId    String
+  provider  Provider
+
+  // Provider-specific identity (e.g. Fitbit user id, Strava athlete id)
+  providerAccountId String
+
+  // OAuth tokens (stored in DB fields for now; encrypt-at-rest later if needed)
+  accessToken       String
+  refreshToken      String?
+  tokenType         String?
+  scope             String?
+  expiresAt         DateTime?
+
+  // Operational metadata
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Raw payloads from provider (token response / profile snapshot)
+  rawAuthPayload   Json?
+  rawProfilePayload Json?
+
+  // Helpful for incremental syncs
+  lastSyncedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  dailyFitbitStats DailyFitbitStat[]
+  fitbitActivityLogs FitbitActivityLog[]
+  stravaActivities StravaActivity[]
+  syncLogs         SyncLog[]
+
+  @@unique([provider, providerAccountId])
+  @@unique([userId, provider])
+  @@index([userId, provider])
+  @@index([provider, updatedAt])
+  @@index([userId, lastSyncedAt])
+}
+
+model DailyFitbitStat {
+  id     String @id @default(cuid())
+  userId String
+
+  // A normalized day key for efficient day-based queries and rollups
+  date DateTime
+
+  // Common daily aggregates (extend as needed)
+  steps               Int?
+  caloriesOut         Int?
+  distanceKm          Float?
+  floors              Int?
+  restingHeartRateBpm Int?
+  activeMinutes       Int?
+
+  // Sleep aggregates (optional)
+  sleepMinutes     Int?
+  sleepEfficiency  Int?
+
+  // Body (Fitbit body/weight scope)
+  weightKg Float?
+
+  // Provider payload for audit/debug/backfills
+  rawPayload Json?
+
+  sourceConnectedAccountId String?
+  connectedAccount         ConnectedAccount? @relation(fields: [sourceConnectedAccountId], references: [id], onDelete: SetNull)
+
+  derivedMetrics DerivedDailyMetric[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@index([date])
+}
+
+model StravaActivity {
+  id     String @id @default(cuid())
+  userId String
+
+  // Strava activity id (string to safely handle large ids)
+  providerActivityId String
+
+  // Times for slicing and time-series analysis
+  startAt        DateTime
+  startDateLocal DateTime?
+  timezone       String?
+
+  type   String?
+  name   String?
+  sportType String?
+
+  distanceMeters Int?
+  movingTimeSec  Int?
+  elapsedTimeSec Int?
+  totalElevationM Float?
+
+  averageSpeedMps Float?
+  averageHrBpm    Int?
+  maxHrBpm        Int?
+
+  calories              Int?
+  weightedAverageWatts  Int?
+
+  // Optional polylines / streams can be stored later; keep raw for now
+  rawPayload Json?
+
+  sourceConnectedAccountId String?
+  connectedAccount         ConnectedAccount? @relation(fields: [sourceConnectedAccountId], references: [id], onDelete: SetNull)
+
+  derivedMetrics DerivedDailyMetric[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, providerActivityId])
+  @@index([userId, startAt])
+  @@index([startAt])
+  @@index([userId, providerActivityId])
+}
+
+// Logged exercises from Fitbit (device / MobileRun). Used to backfill runs that
+// never existed as Strava activities (e.g. historical tracker-only runs).
+model FitbitActivityLog {
+  id     String @id @default(cuid())
+  userId String
+
+  logId String
+
+  activityName     String?
+  activityTypeId   Int?
+  startAt          DateTime
+  durationMs       Int?
+  distanceMeters   Int?
+  elevationGainM   Float?
+  averageHeartRateBpm Int?
+  maxHeartRateBpm  Int?
+  calories         Int?
+  logType          String?
+
+  rawPayload Json?
+
+  sourceConnectedAccountId String?
+  connectedAccount         ConnectedAccount? @relation(fields: [sourceConnectedAccountId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, logId])
+  @@index([userId, startAt])
+  @@index([startAt])
+}
+
+// Pre-aggregated monthly rollups for fast long-term (month/year) analytics.
+// Recomputed after each successful Strava / Fitbit sync.
+model MonthlyFitnessSnapshot {
+  id     String @id @default(cuid())
+  userId String
+  year   Int
+  month  Int // 1–12
+
+  // Strava — runs only (type/sport Run)
+  runCount            Int?
+  runDistanceMeters   Int?
+  runMovingTimeSec    Int?
+  runElevGainM        Float?
+  avgPaceSecPerMi     Float?
+
+  // Fitbit — daily stat averages for days with data in that month
+  avgSteps         Float?
+  avgSleepMinutes  Float?
+  avgRestingHr     Float?
+  avgWeightKg      Float?
+  fitbitDaysCount  Int?
+
+  computedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, year, month])
+  @@index([userId, year, month])
+}
+
+model DerivedDailyMetric {
+  id     String @id @default(cuid())
+  userId String
+
+  // Day key matching DailyFitbitStat (or derived from activities)
+  date DateTime
+
+  // Metric key/value for long-term trend analysis (flexible & extensible)
+  key   String
+  value Float
+  unit  String?
+
+  // How it was computed (useful for reproducibility/backfills)
+  algorithmVersion String? // e.g. "v1", "v2.1"
+  computedAt       DateTime @default(now())
+
+  // References to source data (optional)
+  sourceFitbitStatId    String?
+  sourceStravaActivityId String?
+  sourceFitbitStat      DailyFitbitStat? @relation(fields: [sourceFitbitStatId], references: [id], onDelete: SetNull)
+  sourceStravaActivity  StravaActivity? @relation(fields: [sourceStravaActivityId], references: [id], onDelete: SetNull)
+
+  // Keep any intermediate values for debugging
+  rawComputation Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date, key])
+  @@index([userId, date])
+  @@index([key, date])
+}
+
+model SyncLog {
+  id     String @id @default(cuid())
+  userId String
+
+  provider  Provider
+  status    SyncStatus @default(SUCCESS)
+
+  startedAt  DateTime @default(now())
+  finishedAt DateTime?
+
+  // For incremental syncing and auditability
+  cursor        String?
+  windowStartAt DateTime?
+  windowEndAt   DateTime?
+
+  // Counts and any errors
+  fetchedCount  Int? @default(0)
+  upsertedCount Int? @default(0)
+  errorCode     String?
+  errorMessage  String?
+
+  // Store request/response snippets or summaries safely
+  rawPayload Json?
+
+  connectedAccountId String?
+  connectedAccount   ConnectedAccount? @relation(fields: [connectedAccountId], references: [id], onDelete: SetNull)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider, startedAt])
+  @@index([provider, startedAt])
+  @@index([status, startedAt])
+}
+
