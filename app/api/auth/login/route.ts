@@ -8,6 +8,8 @@ import { getValidStravaAccessTokenForUser } from "@/lib/strava";
 import { syncStravaActivitiesWithLog } from "@/lib/strava-sync";
 import { getValidFitbitAccessTokenForUser } from "@/lib/fitbit";
 import { syncFitbitDailyStatsWithLog } from "@/lib/fitbit-sync";
+import { getValidWhoopAccessTokenForUser } from "@/lib/whoop";
+import { syncWhoopDailyStatsWithLog } from "@/lib/whoop-sync";
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -68,6 +70,20 @@ export async function POST(req: Request) {
       connectedAccountId: fitbitAccount.id,
       days: 90,
       getAccessToken: () => getValidFitbitAccessTokenForUser(user.id),
+    });
+  }
+
+  const whoopAccount = await prisma().connectedAccount.findUnique({
+    where: { userId_provider: { userId: user.id, provider: "WHOOP" } },
+    select: { id: true, isActive: true },
+  });
+
+  if (whoopAccount?.isActive) {
+    await syncWhoopDailyStatsWithLog({
+      userId: user.id,
+      connectedAccountId: whoopAccount.id,
+      days: 90,
+      getAccessToken: () => getValidWhoopAccessTokenForUser(user.id),
     });
   }
 

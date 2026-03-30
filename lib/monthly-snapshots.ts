@@ -20,6 +20,15 @@ type FitbitMonthRow = {
   fitbitDaysCount: number;
 };
 
+type WhoopMonthRow = {
+  year: number;
+  month: number;
+  avgWhoopRecovery: number | null;
+  avgWhoopStrain: number | null;
+  avgWhoopHrvMs: number | null;
+  whoopDaysCount: number;
+};
+
 /**
  * Rebuilds monthly rollups from raw Strava + Fitbit rows (full replace per user).
  * Call after sync so long-term / journey views stay fast and accurate.
@@ -78,18 +87,39 @@ export async function recomputeMonthlyFitnessSnapshots(userId: string) {
     GROUP BY 1, 2
   `;
 
+  const whoopRows = await prisma().$queryRaw<WhoopMonthRow[]>`
+    SELECT
+      EXTRACT(YEAR FROM date)::int AS year,
+      EXTRACT(MONTH FROM date)::int AS month,
+      AVG("recoveryScore")::float AS "avgWhoopRecovery",
+      AVG(strain)::float AS "avgWhoopStrain",
+      AVG("hrvRmssdMs")::float AS "avgWhoopHrvMs",
+      COUNT(*)::int AS "whoopDaysCount"
+    FROM "DailyWhoopStat"
+    WHERE "userId" = ${userId}
+    GROUP BY 1, 2
+  `;
+
   const stravaMap = new Map(
     stravaRows.map((r) => [`${r.year}-${r.month}`, r] as const),
   );
   const fitbitMap = new Map(
     fitbitRows.map((r) => [`${r.year}-${r.month}`, r] as const),
   );
-  const keys = new Set([...stravaMap.keys(), ...fitbitMap.keys()]);
+  const whoopMap = new Map(
+    whoopRows.map((r) => [`${r.year}-${r.month}`, r] as const),
+  );
+  const keys = new Set([
+    ...stravaMap.keys(),
+    ...fitbitMap.keys(),
+    ...whoopMap.keys(),
+  ]);
 
   const records = [...keys].map((key) => {
     const [y, m] = key.split("-").map(Number);
     const s = stravaMap.get(key);
     const f = fitbitMap.get(key);
+    const w = whoopMap.get(key);
     return {
       userId,
       year: y,
@@ -104,6 +134,10 @@ export async function recomputeMonthlyFitnessSnapshots(userId: string) {
       avgRestingHr: f?.avgRestingHr ?? null,
       avgWeightKg: f?.avgWeightKg ?? null,
       fitbitDaysCount: f?.fitbitDaysCount ?? null,
+      avgWhoopRecovery: w?.avgWhoopRecovery ?? null,
+      avgWhoopStrain: w?.avgWhoopStrain ?? null,
+      avgWhoopHrvMs: w?.avgWhoopHrvMs ?? null,
+      whoopDaysCount: w?.whoopDaysCount ?? null,
     };
   });
 

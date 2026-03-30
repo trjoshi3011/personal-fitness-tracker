@@ -56,6 +56,28 @@ export default async function JourneyPage() {
       lb: Number(kgToLb(s.avgWeightKg!).toFixed(1)),
     }));
 
+  const whoopRecovery = snapshots
+    .filter((s) => s.avgWhoopRecovery != null && (s.whoopDaysCount ?? 0) > 0)
+    .map((s) => ({
+      period: ymLabel(s.year, s.month),
+      recovery: Math.round(s.avgWhoopRecovery!),
+    }));
+
+  const whoopHrv = snapshots
+    .filter((s) => s.avgWhoopHrvMs != null && (s.whoopDaysCount ?? 0) > 0)
+    .map((s) => ({
+      period: ymLabel(s.year, s.month),
+      hrv: Math.round(s.avgWhoopHrvMs!),
+    }));
+
+  const whoopRecStrainDual = snapshots
+    .filter((s) => (s.whoopDaysCount ?? 0) > 0 && (s.avgWhoopRecovery != null || s.avgWhoopStrain != null))
+    .map((s) => ({
+      period: ymLabel(s.year, s.month),
+      recovery: s.avgWhoopRecovery != null ? Math.round(s.avgWhoopRecovery) : null,
+      strain: s.avgWhoopStrain != null ? Number(s.avgWhoopStrain.toFixed(1)) : null,
+    }));
+
   const monthShort = [
     "Jan",
     "Feb",
@@ -90,20 +112,22 @@ export default async function JourneyPage() {
   const latest = snapshots[snapshots.length - 1];
   const monthsTracked = snapshots.length;
 
+  const latestWhoop = [...snapshots]
+    .reverse()
+    .find((s) => (s.whoopDaysCount ?? 0) > 0 && s.avgWhoopRecovery != null);
+
   return (
     <div className="space-y-8">
       <div>
         <p className="text-sm tracking-widest text-stone-500 uppercase">Long-term</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Journey</h1>
         <p className="mt-2 max-w-2xl text-base leading-relaxed text-stone-600">
-          Month-by-month rollups combine Strava runs and Fitbit logged runs (same window as Fitbit
-          sync). Run a{" "}
-          <span className="font-medium text-stone-800">deep sync</span> in Settings to backfill Strava
-          (years) and Fitbit daily + exercise history (last ~6 months).
+          Month-by-month rollups: running volume from Strava and Fitbit exercise logs; sleep, steps, and weight from
+          Fitbit; recovery, strain, and HRV from WHOOP. Snapshots refresh after each sync (Strava, Fitbit, or WHOOP).
         </p>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           title="Months tracked"
           value={monthsTracked > 0 ? String(monthsTracked) : "—"}
@@ -121,7 +145,7 @@ export default async function JourneyPage() {
               ? formatPaceMinPerMile(latest.avgPaceSecPerMi)
               : "—"
           }
-          hint="Monthly weighted avg"
+          hint="Strava + Fitbit · monthly weighted"
         />
         <StatCard
           title="Latest sleep avg"
@@ -130,14 +154,23 @@ export default async function JourneyPage() {
               ? `${(latest.avgSleepMinutes / 60).toFixed(1)} h/night`
               : "—"
           }
-          hint="Nights with Fitbit data"
+          hint="Fitbit nights in month"
+        />
+        <StatCard
+          title="Latest WHOOP recovery"
+          value={
+            latestWhoop?.avgWhoopRecovery != null
+              ? `${Math.round(latestWhoop.avgWhoopRecovery)}%`
+              : "—"
+          }
+          hint={latestWhoop ? ymLabel(latestWhoop.year, latestWhoop.month) : "Connect WHOOP + sync"}
         />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <ChartCard
           title="Monthly run volume"
-          description="Total Strava run distance per calendar month"
+          description="Strava runs + Fitbit logged runs · miles per calendar month"
         >
           <BarChartView
             data={runMi}
@@ -150,7 +183,7 @@ export default async function JourneyPage() {
         </ChartCard>
         <ChartCard
           title="Average pace by month"
-          description="Lower is faster (weighted by distance)"
+          description="Strava + Fitbit · lower is faster"
         >
           <AreaChartView
             data={paceMin}
@@ -168,7 +201,7 @@ export default async function JourneyPage() {
       <section className="grid gap-4 lg:grid-cols-2">
         <ChartCard
           title="Sleep (monthly average)"
-          description="Fitbit nights averaged per month"
+          description="Fitbit · hours per night averaged by month"
         >
           <AreaChartView
             data={sleepHrs}
@@ -182,7 +215,7 @@ export default async function JourneyPage() {
         </ChartCard>
         <ChartCard
           title="Body weight (monthly average)"
-          description="From Fitbit scale logs (lb) — add weight scope + sync"
+          description="Fitbit scale · lb"
         >
           <AreaChartView
             data={weightLb}
@@ -197,10 +230,56 @@ export default async function JourneyPage() {
         </ChartCard>
       </section>
 
+      {whoopRecStrainDual.length > 0 && (
+        <section className="grid gap-4 lg:grid-cols-2">
+          <ChartCard
+            title="WHOOP recovery vs strain"
+            description="Monthly averages · days with WHOOP data in that month"
+            className="lg:col-span-2"
+          >
+            <MultiLineChartView
+              data={whoopRecStrainDual}
+              xKey="period"
+              lines={[
+                { dataKey: "recovery", color: "#22c55e", name: "Recovery %", yAxisId: "left" },
+                { dataKey: "strain", color: chartPalette.adobe, name: "Strain", yAxisId: "right" },
+              ]}
+              yDomain={[0, 100]}
+              rightYDomain={[0, "dataMax"]}
+              height={260}
+            />
+          </ChartCard>
+          <ChartCard title="WHOOP recovery %" description="Monthly average">
+            <AreaChartView
+              data={whoopRecovery}
+              xKey="period"
+              yKey="recovery"
+              color="#22c55e"
+              yUnit="%"
+              gradientId="j-wrec"
+              height={240}
+              yDomain={[0, 100]}
+            />
+          </ChartCard>
+          <ChartCard title="WHOOP HRV" description="Monthly avg RMSSD (ms)">
+            <AreaChartView
+              data={whoopHrv}
+              xKey="period"
+              yKey="hrv"
+              color="#22c55e"
+              yUnit=" ms"
+              gradientId="j-whrv"
+              height={240}
+              yDomain={["dataMin", "dataMax"]}
+            />
+          </ChartCard>
+        </section>
+      )}
+
       <section>
         <ChartCard
           title="Year-over-year run volume"
-          description={`${lastYear} vs ${thisYear} — same calendar month`}
+          description={`Strava + Fitbit · ${lastYear} vs ${thisYear} (same calendar month)`}
         >
           <MultiLineChartView
             data={yoyData}

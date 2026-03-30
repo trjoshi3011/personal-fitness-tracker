@@ -1,0 +1,415 @@
+import { prisma } from "@/lib/db";
+import { recomputeMonthlyFitnessSnapshots } from "@/lib/monthly-snapshots";
+import {
+  MAX_WHOOP_SYNC_DAYS,
+  utcInclusiveWindowStart,
+} from "@/lib/sync-constants";
+
+const WHOOP_API = "https://api.prod.whoop.com/developer";
+
+function isoToUserLocalUtcDate(iso: string, timeZone: string): Date {
+  const d = new Date(iso);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const y = Number(parts.find((p) => p.type === "year")?.value);
+  const m = Number(parts.find((p) => p.type === "month")?.value);
+  const day = Number(parts.find((p) => p.type === "day")?.value);
+  if (!y || !m || !day) {
+    return new Date(
+      Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
+    );
+  }
+  return new Date(Date.UTC(y, m - 1, day));
+}
+
+async function whoopGetJson(path: string, accessToken: string) {
+  const res = await fetch(`${WHOOP_API}${path}`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  const json = (await res.json().catch(() => null)) as unknown;
+  if (!res.ok) {
+    const msg =
+      typeof (json as { message?: string })?.message === "string"
+        ? (json as { message: string }).message
+        : `WHOOP API request failed (${res.status})`;
+    throw new Error(msg);
+  }
+  return json;
+}
+
+type RecoveryRow = {
+  cycle_id: number;
+  sleep_id: string;
+  score_state: string;
+  score?: {
+    user_calibrating?: boolean;
+    recovery_score?: number;
+    resting_heart_rate?: number;
+    hrv_rmssd_milli?: number;
+    spo2_percentage?: number;
+    skin_temp_celsius?: number;
+  };
+};
+
+type SleepRow = {
+  nap?: boolean;
+  end?: string;
+  score_state?: string;
+  score?: {
+    stage_summary?: { total_in_bed_time_milli?: number };
+    sleep_performance_percentage?: number;
+    sleep_efficiency_percentage?: number;
+    sleep_consistency_percentage?: number;
+  };
+};
+
+type CycleRow = {
+  score_state?: string;
+  score?: {
+    strain?: number;
+  };
+};
+
+type DayAgg = {
+  recoveryScore: number | null;
+  strain: number | null;
+  restingHeartRateBpm: number | null;
+  hrvRmssdMs: number | null;
+  spo2Percentage: number | null;
+  skinTempCelsius: number | null;
+  sleepMinutes: number | null;
+  sleepPerformancePct: number | null;
+  sleepEfficiencyPct: number | null;
+  sleepConsistencyPct: number | null;
+  nap: boolean;
+  priority: number;
+  raw: Record<string, unknown>;
+};
+
+function emptyAgg(): DayAgg {
+  return {
+    recoveryScore: null,
+    strain: null,
+    restingHeartRateBpm: null,
+    hrvRmssdMs: null,
+    spo2Percentage: null,
+    skinTempCelsius: null,
+    sleepMinutes: null,
+    sleepPerformancePct: null,
+    sleepEfficiencyPct: null,
+    sleepConsistencyPct: null,
+    nap: true,
+    priority: -1,
+    raw: {},
+  };
+}
+
+function aggPriority(nap: boolean, recoveryScore: number | null): number {
+  const rs = recoveryScore ?? 0;
+  return (nap ? 0 : 1_000_000) + rs;
+}
+
+function shouldReplace(existing: DayAgg, incoming: DayAgg): boolean {
+  return incoming.priority > existing.priority;
+}
+
+export async function syncWhoopDailyStats({
+  userId,
+  connectedAccountId,
+  accessToken,
+  days,
+}: {
+  userId: string;
+  connectedAccountId: string;
+  accessToken: string;
+  days: number;
+}) {
+  const user = await prisma().user.findUnique({
+    where: { id: userId },
+    select: { timezone: true },
+  });
+  const tz = user?.timezone?.trim() || "UTC";
+
+  const daysClamped =
+    Number.isFinite(days) && days > 0
+      ? Math.min(days, MAX_WHOOP_SYNC_DAYS)
+      : 90;
+
+  const windowEndAt = new Date();
+  const windowStartAt = utcInclusiveWindowStart(windowEndAt, daysClamped);
+
+  const startIso = windowStartAt.toISOString();
+  const endIso = windowEndAt.toISOString();
+
+  const cycleCache = new Map<number, CycleRow>();
+
+  const map = new Map<string, DayAgg>();
+
+  let nextToken: string | undefined;
+  let fetched = 0;
+
+  do {
+    const q = new URLSearchParams({
+      limit: "25",
+      start: startIso,
+      end: endIso,
+    });
+    if (nextToken) q.set("nextToken", nextToken);
+
+    const page = (await whoopGetJson(
+      `/v2/recovery?${q.toString()}`,
+      accessToken,
+    )) as { records?: RecoveryRow[]; next_token?: string };
+
+    const records = page.records ?? [];
+    nextToken = page.next_token;
+
+    for (const rec of records) {
+      if (rec.score_state !== "SCORED" || !rec.score) continue;
+
+      let sleep: SleepRow | null = null;
+      try {
+        sleep = (await whoopGetJson(
+          `/v2/activity/sleep/${encodeURIComponent(rec.sleep_id)}`,
+          accessToken,
+        )) as SleepRow;
+      } catch {
+        continue;
+      }
+
+      if (sleep.score_state && sleep.score_state !== "SCORED") continue;
+      if (!sleep.end) continue;
+
+      const dayDate = isoToUserLocalUtcDate(sleep.end, tz);
+      const dayKey = dayDate.toISOString().slice(0, 10);
+      const nap = Boolean(sleep.nap);
+
+      const sc = rec.score;
+      const recoveryScore =
+        sc.recovery_score != null && Number.isFinite(sc.recovery_score)
+          ? Math.round(sc.recovery_score)
+          : null;
+      const incoming: DayAgg = {
+        recoveryScore,
+        strain: null,
+        restingHeartRateBpm:
+          sc.resting_heart_rate != null && Number.isFinite(sc.resting_heart_rate)
+            ? Math.round(sc.resting_heart_rate)
+            : null,
+        hrvRmssdMs:
+          sc.hrv_rmssd_milli != null && Number.isFinite(sc.hrv_rmssd_milli)
+            ? sc.hrv_rmssd_milli
+            : null,
+        spo2Percentage:
+          sc.spo2_percentage != null && Number.isFinite(sc.spo2_percentage)
+            ? sc.spo2_percentage
+            : null,
+        skinTempCelsius:
+          sc.skin_temp_celsius != null &&
+          Number.isFinite(sc.skin_temp_celsius)
+            ? sc.skin_temp_celsius
+            : null,
+        sleepMinutes: null,
+        sleepPerformancePct: null,
+        sleepEfficiencyPct: null,
+        sleepConsistencyPct: null,
+        nap,
+        priority: aggPriority(nap, recoveryScore),
+        raw: { recovery: rec, sleep },
+      };
+
+      const ss = sleep.score?.stage_summary?.total_in_bed_time_milli;
+      if (typeof ss === "number" && ss > 0) {
+        incoming.sleepMinutes = Math.round(ss / 60000);
+      }
+      const sp = sleep.score?.sleep_performance_percentage;
+      const se = sleep.score?.sleep_efficiency_percentage;
+      const scs = sleep.score?.sleep_consistency_percentage;
+      if (sp != null && Number.isFinite(sp)) incoming.sleepPerformancePct = sp;
+      if (se != null && Number.isFinite(se)) incoming.sleepEfficiencyPct = se;
+      if (scs != null && Number.isFinite(scs))
+        incoming.sleepConsistencyPct = scs;
+
+      let cycle: CycleRow | undefined = cycleCache.get(rec.cycle_id);
+      if (!cycle) {
+        try {
+          cycle = (await whoopGetJson(
+            `/v2/cycle/${rec.cycle_id}`,
+            accessToken,
+          )) as CycleRow;
+          cycleCache.set(rec.cycle_id, cycle);
+        } catch {
+          cycle = undefined;
+        }
+      }
+
+      if (cycle?.score_state === "SCORED" && cycle.score?.strain != null) {
+        const st = cycle.score.strain;
+        if (typeof st === "number" && Number.isFinite(st)) {
+          incoming.strain = st;
+        }
+      }
+
+      const existing = map.get(dayKey);
+      if (!existing || shouldReplace(existing, incoming)) {
+        map.set(dayKey, incoming);
+      }
+
+      fetched += 1;
+    }
+  } while (nextToken);
+
+  let upserted = 0;
+  for (const [dayKey, agg] of map) {
+    const [y, mo, d] = dayKey.split("-").map(Number);
+    if (!y || !mo || !d) continue;
+    const date = new Date(Date.UTC(y, mo - 1, d, 0, 0, 0, 0));
+
+    await prisma().dailyWhoopStat.upsert({
+      where: { userId_date: { userId, date } },
+      create: {
+        userId,
+        date,
+        recoveryScore: agg.recoveryScore,
+        strain: agg.strain,
+        restingHeartRateBpm: agg.restingHeartRateBpm,
+        hrvRmssdMs: agg.hrvRmssdMs,
+        spo2Percentage: agg.spo2Percentage,
+        skinTempCelsius: agg.skinTempCelsius,
+        sleepMinutes: agg.sleepMinutes,
+        sleepPerformancePct: agg.sleepPerformancePct,
+        sleepEfficiencyPct: agg.sleepEfficiencyPct,
+        sleepConsistencyPct: agg.sleepConsistencyPct,
+        rawPayload: agg.raw as object,
+        sourceConnectedAccountId: connectedAccountId,
+      },
+      update: {
+        recoveryScore: agg.recoveryScore,
+        strain: agg.strain,
+        restingHeartRateBpm: agg.restingHeartRateBpm,
+        hrvRmssdMs: agg.hrvRmssdMs,
+        spo2Percentage: agg.spo2Percentage,
+        skinTempCelsius: agg.skinTempCelsius,
+        sleepMinutes: agg.sleepMinutes,
+        sleepPerformancePct: agg.sleepPerformancePct,
+        sleepEfficiencyPct: agg.sleepEfficiencyPct,
+        sleepConsistencyPct: agg.sleepConsistencyPct,
+        rawPayload: agg.raw as object,
+        sourceConnectedAccountId: connectedAccountId,
+      },
+      select: { id: true },
+    });
+    upserted += 1;
+  }
+
+  await prisma().connectedAccount.update({
+    where: { id: connectedAccountId },
+    data: { lastSyncedAt: new Date() },
+  });
+
+  try {
+    await recomputeMonthlyFitnessSnapshots(userId);
+  } catch {
+    // best-effort
+  }
+
+  return {
+    fetched,
+    upserted,
+    days: daysClamped,
+  };
+}
+
+export type WhoopSyncWithLogResult =
+  | { ok: true; fetched: number; upserted: number; days: number }
+  | { ok: false; error: string };
+
+export async function syncWhoopDailyStatsWithLog({
+  userId,
+  connectedAccountId,
+  days,
+  getAccessToken,
+}: {
+  userId: string;
+  connectedAccountId: string;
+  days: number;
+  getAccessToken: () => Promise<string | null>;
+}): Promise<WhoopSyncWithLogResult> {
+  const daysClamped =
+    Number.isFinite(days) && days > 0
+      ? Math.min(days, MAX_WHOOP_SYNC_DAYS)
+      : 90;
+  const startedAt = new Date();
+  const windowEndAt = new Date();
+  const windowStartAt = utcInclusiveWindowStart(windowEndAt, daysClamped);
+
+  const syncLog = await prisma().syncLog.create({
+    data: {
+      userId,
+      provider: "WHOOP",
+      status: "PARTIAL",
+      startedAt,
+      windowStartAt,
+      windowEndAt,
+      connectedAccountId,
+      fetchedCount: 0,
+      upsertedCount: 0,
+    },
+    select: { id: true },
+  });
+
+  try {
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      const msg = "WHOOP not connected";
+      await prisma().syncLog.update({
+        where: { id: syncLog.id },
+        data: {
+          status: "FAILED",
+          finishedAt: new Date(),
+          errorMessage: msg,
+        },
+      });
+      return { ok: false, error: msg };
+    }
+
+    const result = await syncWhoopDailyStats({
+      userId,
+      connectedAccountId,
+      accessToken,
+      days: daysClamped,
+    });
+
+    await prisma().syncLog.update({
+      where: { id: syncLog.id },
+      data: {
+        status: "SUCCESS",
+        finishedAt: new Date(),
+        fetchedCount: result.fetched,
+        upsertedCount: result.upserted,
+      },
+    });
+
+    return {
+      ok: true,
+      fetched: result.fetched,
+      upserted: result.upserted,
+      days: result.days,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    await prisma().syncLog.update({
+      where: { id: syncLog.id },
+      data: {
+        status: "FAILED",
+        finishedAt: new Date(),
+        errorMessage: message,
+      },
+    });
+    return { ok: false, error: message };
+  }
+}

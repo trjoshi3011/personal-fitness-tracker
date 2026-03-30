@@ -9,6 +9,7 @@ datasource db {
 enum Provider {
   FITBIT
   STRAVA
+  WHOOP
 }
 
 enum SyncStatus {
@@ -28,6 +29,7 @@ model User {
 
   connectedAccounts   ConnectedAccount[]
   dailyFitbitStats         DailyFitbitStat[]
+  dailyWhoopStats          DailyWhoopStat[]
   fitbitActivityLogs       FitbitActivityLog[]
   stravaActivities         StravaActivity[]
   derivedDailyMetrics      DerivedDailyMetric[]
@@ -82,6 +84,7 @@ model ConnectedAccount {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   dailyFitbitStats DailyFitbitStat[]
+  dailyWhoopStats  DailyWhoopStat[]
   fitbitActivityLogs FitbitActivityLog[]
   stravaActivities StravaActivity[]
   syncLogs         SyncLog[]
@@ -122,6 +125,40 @@ model DailyFitbitStat {
   connectedAccount         ConnectedAccount? @relation(fields: [sourceConnectedAccountId], references: [id], onDelete: SetNull)
 
   derivedMetrics DerivedDailyMetric[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@index([date])
+}
+
+// Daily WHOOP aggregates (recovery, strain, sleep) keyed by wake-day in the user’s timezone.
+model DailyWhoopStat {
+  id     String @id @default(cuid())
+  userId String
+
+  date DateTime
+
+  recoveryScore       Int?
+  strain              Float?
+  restingHeartRateBpm Int?
+  hrvRmssdMs          Float?
+  spo2Percentage      Float?
+  skinTempCelsius     Float?
+
+  sleepMinutes            Int?
+  sleepPerformancePct     Float?
+  sleepEfficiencyPct      Float?
+  sleepConsistencyPct     Float?
+
+  rawPayload Json?
+
+  sourceConnectedAccountId String?
+  connectedAccount         ConnectedAccount? @relation(fields: [sourceConnectedAccountId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -235,6 +272,12 @@ model MonthlyFitnessSnapshot {
   avgRestingHr     Float?
   avgWeightKg      Float?
   fitbitDaysCount  Int?
+
+  // WHOOP — daily aggregates for days with data in that month
+  avgWhoopRecovery Float?
+  avgWhoopStrain   Float?
+  avgWhoopHrvMs    Float?
+  whoopDaysCount   Int?
 
   computedAt DateTime @default(now())
   updatedAt  DateTime @updatedAt

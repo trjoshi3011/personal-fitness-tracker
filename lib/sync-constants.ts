@@ -6,6 +6,8 @@ export const MAX_FITBIT_SYNC_DAYS = 183;
 export const MAX_FITBIT_RUN_LOG_DAYS = 365;
 /** Fitbit time-series endpoints are safest in sub-year chunks. */
 export const FITBIT_API_CHUNK_DAYS = 90;
+/** WHOOP recovery/sleep collection window (API paginates; cap manual deep sync). */
+export const MAX_WHOOP_SYNC_DAYS = 180;
 
 /**
  * UTC midnight of the calendar day that is `wholeDays` before the UTC calendar

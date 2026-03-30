@@ -3,6 +3,7 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { AreaChartView } from "@/components/charts/area-chart";
 import { BarChartView } from "@/components/charts/bar-chart";
 import { MultiLineChartView } from "@/components/charts/multi-line-chart";
+import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import {
   fetchNormalizedRunsInRange,
@@ -20,19 +21,63 @@ import {
 
 export const dynamic = "force-dynamic";
 
+function shortDay(d: Date) {
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 export default async function RunningPage() {
   const userId = await requireUserId();
   const now = new Date();
   const start7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const start30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const runs7 = await fetchNormalizedRunsInRange(userId, start7, now);
-  const recentRuns = await fetchRecentRunTableRows(userId, 30);
+  const [runs7, recentRuns, whoop7, whoop30] = await Promise.all([
+    fetchNormalizedRunsInRange(userId, start7, now),
+    fetchRecentRunTableRows(userId, 30),
+    prisma().dailyWhoopStat.findMany({
+      where: { userId, date: { gte: start7 } },
+      select: { recoveryScore: true, strain: true, hrvRmssdMs: true },
+    }),
+    prisma().dailyWhoopStat.findMany({
+      where: { userId, date: { gte: start30 } },
+      select: {
+        date: true,
+        recoveryScore: true,
+        strain: true,
+      },
+      orderBy: { date: "asc" },
+    }),
+  ]);
 
   const runCount = runs7.length;
   const totalMeters = runs7.reduce((acc, r) => acc + (r.distanceMeters ?? 0), 0);
   const totalSeconds = runs7.reduce((acc, r) => acc + (r.movingTimeSec ?? 0), 0);
   const longestMeters = runs7.reduce((acc, r) => Math.max(acc, r.distanceMeters ?? 0), 0);
   const avgPace = formatPaceMinPerMile(paceSecondsPerMile({ seconds: totalSeconds, meters: totalMeters }));
+
+  const wRec = whoop7.filter((r) => r.recoveryScore != null);
+  const whoopAvgRecovery =
+    wRec.length > 0
+      ? Math.round(wRec.reduce((a, r) => a + (r.recoveryScore ?? 0), 0) / wRec.length)
+      : null;
+  const wStr = whoop7.filter((r) => r.strain != null);
+  const whoopAvgStrain =
+    wStr.length > 0
+      ? wStr.reduce((a, r) => a + (r.strain ?? 0), 0) / wStr.length
+      : null;
+  const wHrv = whoop7.filter((r) => r.hrvRmssdMs != null && r.hrvRmssdMs > 0);
+  const whoopAvgHrv =
+    wHrv.length > 0
+      ? wHrv.reduce((a, r) => a + (r.hrvRmssdMs ?? 0), 0) / wHrv.length
+      : null;
+
+  const whoopRecStrainChart = whoop30
+    .filter((r) => r.recoveryScore != null || r.strain != null)
+    .map((r) => ({
+      day: shortDay(r.date),
+      recovery: r.recoveryScore,
+      strain: r.strain != null ? Number(r.strain.toFixed(1)) : null,
+    }));
 
   // Pace trend: per-run pace over time (newest last for chart)
   const paceData = [...recentRuns]
@@ -74,16 +119,25 @@ export default async function RunningPage() {
         <p className="text-sm tracking-widest text-stone-500 uppercase">Training</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Running</h1>
         <p className="mt-2 text-base leading-relaxed text-stone-600">
-          Runs from Strava and from Fitbit exercise history (e.g. tracker runs before Strava sync).
+          Runs from Strava and Fitbit exercise logs. WHOOP shows how recovered you were for the same window — useful next to training volume.
         </p>
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Runs" value={String(runCount)} hint="Last 7 days" />
-        <StatCard title="Distance" value={`${metersToMiles(totalMeters).toFixed(1)} mi`} hint="Last 7 days" />
-        <StatCard title="Avg pace" value={avgPace} hint="Last 7 days (moving time)" />
-        <StatCard title="Longest run" value={`${metersToMiles(longestMeters).toFixed(1)} mi`} hint="Last 7 days" />
+        <StatCard title="Runs" value={String(runCount)} hint="Strava + Fitbit · 7d" />
+        <StatCard title="Distance" value={`${metersToMiles(totalMeters).toFixed(1)} mi`} hint="Strava + Fitbit · 7d" />
+        <StatCard title="Avg pace" value={avgPace} hint="Strava + Fitbit · 7d" />
+        <StatCard title="Longest run" value={`${metersToMiles(longestMeters).toFixed(1)} mi`} hint="Strava + Fitbit · 7d" />
       </section>
+
+      <div>
+        <p className="mb-3 text-xs font-medium tracking-wider text-stone-500 uppercase">WHOOP · same week as your runs</p>
+        <section className="grid gap-4 md:grid-cols-3">
+          <StatCard title="Recovery" value={whoopAvgRecovery != null ? `${whoopAvgRecovery}%` : "—"} hint="7-day avg" />
+          <StatCard title="Strain" value={whoopAvgStrain != null ? whoopAvgStrain.toFixed(1) : "—"} hint="7-day avg" />
+          <StatCard title="HRV" value={whoopAvgHrv != null ? `${Math.round(whoopAvgHrv)} ms` : "—"} hint="7-day RMSSD" />
+        </section>
+      </div>
 
       <section className="grid gap-4 lg:grid-cols-3">
         <ChartCard title="Pace trend" description="Min/mi per run (lower is faster)" className="lg:col-span-2">
@@ -103,7 +157,7 @@ export default async function RunningPage() {
       </section>
 
       <section>
-        <ChartCard title="Heart rate" description="Avg and max HR per run" contentClassName="pt-0">
+        <ChartCard title="Heart rate" description="Per run · Strava & Fitbit logs with HR" contentClassName="pt-0">
           <MultiLineChartView
             data={hrData}
             xKey="date"
@@ -116,6 +170,27 @@ export default async function RunningPage() {
           />
         </ChartCard>
       </section>
+
+      {whoop30.length > 0 && (
+        <section>
+          <ChartCard
+            title="WHOOP recovery vs strain"
+            description="Daily physiological load vs readiness · last 30 days (not per-run)"
+          >
+            <MultiLineChartView
+              data={whoopRecStrainChart}
+              xKey="day"
+              lines={[
+                { dataKey: "recovery", color: "#22c55e", name: "Recovery %", yAxisId: "left" },
+                { dataKey: "strain", color: chartPalette.adobe, name: "Strain", yAxisId: "right" },
+              ]}
+              yDomain={[0, 100]}
+              rightYDomain={[0, "dataMax"]}
+              height={220}
+            />
+          </ChartCard>
+        </section>
+      )}
 
       <section>
         <ChartCard

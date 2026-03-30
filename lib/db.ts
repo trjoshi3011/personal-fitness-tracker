@@ -34,7 +34,7 @@ function getPool() {
 }
 
 /** If this model delegate is missing, the process is holding a pre-generate client. */
-const PRISMA_SCHEMA_MARKER = "fitbitActivityLog" as const;
+const PRISMA_SCHEMA_MARKER = "dailyWhoopStat" as const;
 
 function discardStalePrismaClient(client: PrismaClient) {
   void client.$disconnect().catch(() => {});

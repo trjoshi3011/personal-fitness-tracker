@@ -3,6 +3,7 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { MultiLineChartView } from "@/components/charts/multi-line-chart";
 import { BarChartView } from "@/components/charts/bar-chart";
 import { AreaChartView } from "@/components/charts/area-chart";
+import { AiInsights } from "@/components/dashboard/ai-insights";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { fetchNormalizedRunsInRange } from "@/lib/merged-runs";
@@ -23,50 +24,12 @@ function shortDate(d: Date) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function buildNarrative({
-  weightFirst,
-  weightLast,
-  sleepNights,
-  avgSleepH,
-  runCount,
-}: {
-  weightFirst: number | null;
-  weightLast: number | null;
-  sleepNights: number;
-  avgSleepH: number | null;
-  runCount: number;
-}) {
-  const parts: string[] = [];
-
-  if (runCount > 0 && sleepNights > 0 && avgSleepH != null) {
-    parts.push(
-      `Across ${runCount} runs and ${sleepNights} nights with sleep data, you averaged about ${avgSleepH.toFixed(1)} h sleep — pairing that column with pace on the chart helps spot whether short sleep precedes sluggish splits.`,
-    );
-  }
-
-  if (weightFirst != null && weightLast != null) {
-    const deltaKg = weightLast - weightFirst;
-    const deltaLb = kgToLb(Math.abs(deltaKg));
-    if (deltaLb >= 0.5) {
-      parts.push(
-        `Weight shifted ${deltaKg < 0 ? "down" : "up"} ~${deltaLb.toFixed(1)} lb over this window — long-term trajectory matters more than any single weigh-in.`,
-      );
-    }
-  }
-
-  if (parts.length === 0) {
-    return "Connect Strava and Fitbit, sync a longer window, and log weight in Fitbit to unlock richer correlations here.";
-  }
-
-  return parts.join(" ");
-}
-
 export default async function InsightsPage() {
   const userId = await requireUserId();
   const now = new Date();
   const start30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [runs30, fitbit30] = await Promise.all([
+  const [runs30, fitbit30, whoop30] = await Promise.all([
     fetchNormalizedRunsInRange(userId, start30, now),
     prisma().dailyFitbitStat.findMany({
       where: { userId, date: { gte: start30 } },
@@ -78,6 +41,19 @@ export default async function InsightsPage() {
         activeMinutes: true,
         caloriesOut: true,
         weightKg: true,
+      },
+      orderBy: { date: "asc" },
+    }),
+    prisma().dailyWhoopStat.findMany({
+      where: { userId, date: { gte: start30 } },
+      select: {
+        date: true,
+        recoveryScore: true,
+        strain: true,
+        restingHeartRateBpm: true,
+        hrvRmssdMs: true,
+        sleepMinutes: true,
+        sleepPerformancePct: true,
       },
       orderBy: { date: "asc" },
     }),
@@ -101,6 +77,18 @@ export default async function InsightsPage() {
   const avgSleepH =
     sleepRows.length > 0
       ? sleepRows.reduce((a, r) => a + (r.sleepMinutes ?? 0), 0) / sleepRows.length / 60
+      : null;
+
+  // WHOOP aggregates
+  const recoveryRows = whoop30.filter((r) => r.recoveryScore != null);
+  const avgRecovery =
+    recoveryRows.length > 0
+      ? Math.round(recoveryRows.reduce((a, r) => a + (r.recoveryScore ?? 0), 0) / recoveryRows.length)
+      : null;
+  const hrvRows = whoop30.filter((r) => r.hrvRmssdMs != null && r.hrvRmssdMs > 0);
+  const avgHrv =
+    hrvRows.length > 0
+      ? hrvRows.reduce((a, r) => a + (r.hrvRmssdMs ?? 0), 0) / hrvRows.length
       : null;
 
   const fitbitByDate = new Map(fitbit30.map((f) => [isoDay(f.date), f]));
@@ -160,13 +148,21 @@ export default async function InsightsPage() {
     lb: Number(kgToLb(r.weightKg!).toFixed(1)),
   }));
 
-  const narrative = buildNarrative({
-    weightFirst,
-    weightLast,
-    sleepNights: sleepRows.length,
-    avgSleepH,
-    runCount: runsThisMonth,
-  });
+  // WHOOP chart data
+  const recoveryData = whoop30
+    .filter((r) => r.recoveryScore != null)
+    .map((r) => ({
+      day: shortDate(r.date),
+      recovery: r.recoveryScore,
+      strain: r.strain != null ? Number(r.strain.toFixed(1)) : null,
+    }));
+
+  const hrvData = whoop30
+    .filter((r) => r.hrvRmssdMs != null && r.hrvRmssdMs > 0)
+    .map((r) => ({
+      day: shortDate(r.date),
+      hrv: Number((r.hrvRmssdMs ?? 0).toFixed(0)),
+    }));
 
   return (
     <div className="space-y-8">
@@ -174,17 +170,15 @@ export default async function InsightsPage() {
         <p className="text-sm tracking-widest text-stone-500 uppercase">Analytics</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Insights</h1>
         <p className="mt-2 text-base leading-relaxed text-stone-600">
-          Thirty-day view with runs (Strava + Fitbit exercise logs) and Fitbit body data where available.
+          AI-powered analysis of your fitness data from Strava, Fitbit, and WHOOP — plus 30-day charts.
         </p>
       </div>
 
-      <ChartCard title="What the data suggests" description="Heuristic summary — not medical advice">
-        <p className="text-sm leading-relaxed text-stone-700">{narrative}</p>
-      </ChartCard>
+      <AiInsights />
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Runs" value={String(runsThisMonth)} hint="Last 30 days" />
-        <StatCard title="Total distance" value={`${totalMi30.toFixed(1)} mi`} hint="Last 30 days" />
+        <StatCard title="Runs" value={String(runsThisMonth)} hint="Strava + Fitbit · 30d" />
+        <StatCard title="Total distance" value={`${totalMi30.toFixed(1)} mi`} hint="Strava + Fitbit · 30d" />
         <StatCard title="Consistency" value={`${consistency}%`} hint="Days with a run / 30" />
         <StatCard title="Best day" value={dayNames[bestDayIdx]} hint="Most run volume" />
         <StatCard
@@ -194,17 +188,60 @@ export default async function InsightsPage() {
               ? `${kgToLb(weightLast - weightFirst) >= 0 ? "+" : ""}${kgToLb(weightLast - weightFirst).toFixed(1)} lb`
               : "—"
           }
-          hint="First vs last logged (30d)"
+          hint="Fitbit · first vs last (30d)"
         />
         <StatCard
           title="Sleep (avg)"
           value={avgSleepH != null ? `${avgSleepH.toFixed(1)} h` : "—"}
           hint="Nights with Fitbit sleep"
         />
+        <StatCard
+          title="Recovery"
+          value={avgRecovery != null ? `${avgRecovery}%` : "—"}
+          hint="30-day avg (WHOOP)"
+        />
+        <StatCard
+          title="HRV"
+          value={avgHrv != null ? `${avgHrv.toFixed(0)} ms` : "—"}
+          hint="30-day avg RMSSD (WHOOP)"
+        />
       </section>
 
+      {recoveryData.length > 0 && (
+        <section className="grid gap-4 lg:grid-cols-2">
+          <ChartCard title="WHOOP Recovery vs Strain" description="Daily recovery % and strain score">
+            <MultiLineChartView
+              data={recoveryData}
+              xKey="day"
+              lines={[
+                { dataKey: "recovery", color: "#22c55e", name: "Recovery %", yAxisId: "left" },
+                { dataKey: "strain", color: chartPalette.adobe, name: "Strain", yAxisId: "right" },
+              ]}
+              yDomain={[0, 100]}
+              rightYDomain={[0, "dataMax"]}
+              height={240}
+            />
+          </ChartCard>
+          <ChartCard title="Heart Rate Variability" description="WHOOP HRV RMSSD (ms) — higher = better recovered">
+            <AreaChartView
+              data={hrvData}
+              xKey="day"
+              yKey="hrv"
+              color="#22c55e"
+              yUnit=" ms"
+              gradientId="ins-hrv"
+              height={240}
+              yDomain={["dataMin", "dataMax"]}
+            />
+          </ChartCard>
+        </section>
+      )}
+
       <section className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Sleep vs pace" description="Sleep night before vs run pace (min/mi)">
+        <ChartCard
+          title="Sleep vs pace"
+          description="Fitbit sleep night before vs Strava/Fitbit run pace (min/mi)"
+        >
           <MultiLineChartView
             data={sleepPace}
             xKey="day"
@@ -217,7 +254,7 @@ export default async function InsightsPage() {
             height={240}
           />
         </ChartCard>
-        <ChartCard title="RHR vs active minutes" description="Recovery signal vs daily movement">
+        <ChartCard title="RHR vs active minutes" description="Fitbit resting HR vs active minutes · 30d">
           <MultiLineChartView
             data={rhrActiveData}
             xKey="day"
@@ -248,7 +285,11 @@ export default async function InsightsPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3">
-        <ChartCard title="Weekly run volume" description="Miles per week" className="lg:col-span-2">
+        <ChartCard
+          title="Weekly run volume"
+          description="Strava + Fitbit · miles per week"
+          className="lg:col-span-2"
+        >
           <BarChartView data={weeklyData} xKey="week" yKey="mi" color={chartPalette.amazon} yUnit=" mi" />
         </ChartCard>
         <ChartCard title="Activity calories" description="Fitbit daily burn (time series)">
