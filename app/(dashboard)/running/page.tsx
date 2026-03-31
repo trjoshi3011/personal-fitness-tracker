@@ -3,6 +3,7 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { AreaChartView } from "@/components/charts/area-chart";
 import { BarChartView } from "@/components/charts/bar-chart";
 import { MultiLineChartView } from "@/components/charts/multi-line-chart";
+import { RunningChat } from "@/components/dashboard/running-chat";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import {
@@ -260,6 +261,8 @@ export default async function RunningPage() {
           </div>
         </ChartCard>
       </section>
+
+      <RunningChat />
     </div>
   );
 }
