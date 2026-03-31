@@ -4,6 +4,7 @@ import { requireUserId } from "@/lib/auth";
 import Link from "next/link";
 import { getRecentStravaActivities } from "@/lib/strava";
 import { metersToMiles, minutesToHhMm } from "@/lib/units";
+import { getTimezones } from "@/lib/timezones";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ type SettingsSearch = {
   whoopSync?: string;
   fetched?: string;
   upserted?: string;
+  profile?: string;
+  password?: string;
 };
 
 export default async function SettingsPage({
@@ -26,6 +29,11 @@ export default async function SettingsPage({
 }) {
   const sp = (await searchParams) ?? {};
   const userId = await requireUserId();
+  const timezones = getTimezones();
+  const user = await prisma().user.findUnique({
+    where: { id: userId },
+    select: { email: true, firstName: true, lastName: true, timezone: true },
+  });
   const strava = await prisma().connectedAccount.findUnique({
     where: { userId_provider: { userId, provider: "STRAVA" } },
     select: {
@@ -118,7 +126,9 @@ export default async function SettingsPage({
         sp.whoop === "error" ||
         sp.stravaSync ||
         sp.fitbitSync ||
-        sp.whoopSync) && (
+        sp.whoopSync ||
+        sp.profile ||
+        sp.password) && (
         <div className="space-y-2 rounded-xl border border-amber-900/15 bg-card/80 p-4 text-sm text-stone-700">
           {sp.strava === "connected" ? (
             <p>Strava connected successfully.</p>
@@ -182,6 +192,21 @@ export default async function SettingsPage({
           ) : null}
           {sp.whoopSync === "not_connected" ? (
             <p className="text-orange-900">Connect WHOOP before syncing.</p>
+          ) : null}
+          {sp.profile === "ok" ? (
+            <p>Profile updated successfully.</p>
+          ) : null}
+          {sp.profile === "error" ? (
+            <p className="text-orange-900">
+              Could not update profile
+              {sp.reason ? `: ${sp.reason}` : ""}.
+            </p>
+          ) : null}
+          {sp.password === "error" ? (
+            <p className="text-orange-900">
+              Could not change password
+              {sp.reason ? `: ${sp.reason}` : ""}.
+            </p>
           ) : null}
         </div>
       )}
@@ -482,29 +507,126 @@ export default async function SettingsPage({
           <CardHeader>
             <CardTitle>Profile</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-stone-500">
-            Placeholder settings panel.
+          <CardContent>
+            <form action="/api/settings/profile" method="post" className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                    First name
+                  </div>
+                  <input
+                    name="firstName"
+                    required
+                    defaultValue={user?.firstName ?? ""}
+                    className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  />
+                </label>
+                <label className="block">
+                  <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                    Last name
+                  </div>
+                  <input
+                    name="lastName"
+                    required
+                    defaultValue={user?.lastName ?? ""}
+                    className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                  Email
+                </div>
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  defaultValue={user?.email ?? ""}
+                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                />
+              </label>
+
+              <label className="block">
+                <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                  Timezone
+                </div>
+                <select
+                  name="timezone"
+                  required
+                  defaultValue={user?.timezone ?? "UTC"}
+                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                >
+                  {timezones.map((tz) => (
+                    <option key={tz.value} value={tz.value}>
+                      {tz.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <button className="inline-flex h-10 items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800">
+                Save profile
+              </button>
+            </form>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Units</CardTitle>
+            <CardTitle>Password</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-stone-500">
-            Placeholder settings panel.
+          <CardContent>
+            <form action="/api/settings/password" method="post" className="space-y-3">
+              <label className="block">
+                <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                  Current password
+                </div>
+                <input
+                  name="currentPassword"
+                  type="password"
+                  required
+                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                />
+              </label>
+
+              <label className="block">
+                <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                  New password
+                </div>
+                <input
+                  name="newPassword"
+                  type="password"
+                  minLength={8}
+                  required
+                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                />
+              </label>
+
+              <label className="block">
+                <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                  Confirm new password
+                </div>
+                <input
+                  name="confirmPassword"
+                  type="password"
+                  minLength={8}
+                  required
+                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                />
+              </label>
+
+              <p className="text-xs text-stone-500">
+                Changing your password will sign you out from all devices.
+              </p>
+
+              <button className="inline-flex h-10 items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800">
+                Update password
+              </button>
+            </form>
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Data</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-stone-500">
-          Placeholder section for imports/exports, retention, and backups.
-        </CardContent>
-      </Card>
     </div>
   );
 }

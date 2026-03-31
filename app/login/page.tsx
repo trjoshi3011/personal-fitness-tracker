@@ -5,7 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams?: { next?: string; error?: string };
+  searchParams?: {
+    next?: string;
+    error?: string;
+    forgot?: string;
+    reason?: string;
+    password?: string;
+  };
 }) {
   const next = searchParams?.next ?? "/overview";
 
@@ -32,6 +38,21 @@ export default function LoginPage({
             {searchParams?.error ? (
               <div className="rounded-xl border border-rose-500/20 bg-rose-50/60 p-3 text-sm text-rose-700">
                 {searchParams.error}
+              </div>
+            ) : null}
+            {searchParams?.forgot === "ok" ? (
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/60 p-3 text-sm text-emerald-700">
+                {searchParams.reason ?? "Password reset complete. Please log in."}
+              </div>
+            ) : null}
+            {searchParams?.forgot === "error" ? (
+              <div className="rounded-xl border border-rose-500/20 bg-rose-50/60 p-3 text-sm text-rose-700">
+                {searchParams.reason ?? "Could not reset password."}
+              </div>
+            ) : null}
+            {searchParams?.password === "updated" ? (
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/60 p-3 text-sm text-emerald-700">
+                Password changed successfully. Log in with your new password.
               </div>
             ) : null}
 
@@ -70,6 +91,56 @@ export default function LoginPage({
                 Create an account
               </Link>
             </div>
+
+            <details className="rounded-xl border border-amber-900/10 bg-amber-50/30 p-3">
+              <summary className="cursor-pointer text-sm font-medium text-stone-700">
+                Forgot my password
+              </summary>
+              <form
+                action="/api/auth/forgot-password"
+                method="post"
+                className="mt-3 space-y-3"
+              >
+                <label className="block">
+                  <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                    Email
+                  </div>
+                  <input
+                    name="email"
+                    type="email"
+                    required
+                    className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  />
+                </label>
+                <label className="block">
+                  <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                    New password
+                  </div>
+                  <input
+                    name="password"
+                    type="password"
+                    minLength={8}
+                    required
+                    className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  />
+                </label>
+                <label className="block">
+                  <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                    Confirm new password
+                  </div>
+                  <input
+                    name="confirmPassword"
+                    type="password"
+                    minLength={8}
+                    required
+                    className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  />
+                </label>
+                <button className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-900/15 bg-card/70 px-3 text-sm font-medium text-stone-700 transition-all hover:border-orange-500/40 hover:bg-amber-50/70 hover:text-orange-700">
+                  Reset password
+                </button>
+              </form>
+            </details>
           </CardContent>
         </Card>
       </div>

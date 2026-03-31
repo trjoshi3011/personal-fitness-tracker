@@ -29,13 +29,23 @@ function shortDay(d: Date) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function getGreeting(hour: number) {
+  if (hour < 12) return "Good Morning";
+  if (hour < 18) return "Good Afternoon";
+  return "Good Evening";
+}
+
 export default async function OverviewPage() {
   const userId = await requireUserId();
   const now = new Date();
   const start7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const start30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [activities7, fitbitWeek, fitbit30, whoopWeek, whoop30] = await Promise.all([
+  const [user, activities7, fitbitWeek, fitbit30, whoopWeek, whoop30] = await Promise.all([
+    prisma().user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, timezone: true },
+    }),
     fetchNormalizedRunsInRange(userId, start7, now),
     prisma().dailyFitbitStat.findMany({
       where: { userId, date: { gte: start7 } },
@@ -149,11 +159,24 @@ export default async function OverviewPage() {
       hrv: Math.round(r.hrvRmssdMs ?? 0),
     }));
 
+  const tz = user?.timezone?.trim() || "UTC";
+  const localHour = Number(
+    new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      hour12: false,
+      timeZone: tz,
+    }).format(now),
+  );
+  const greeting = getGreeting(Number.isFinite(localHour) ? localHour : 12);
+  const firstName = user?.firstName?.trim() || "there";
+
   return (
     <div className="space-y-8">
       <div>
         <p className="text-sm tracking-widest text-stone-500 uppercase">Dashboard</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Overview</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">
+          {greeting}, {firstName}
+        </h1>
         <p className="mt-2 text-base leading-relaxed text-stone-600">
           Runs from Strava and Fitbit logs; daily wellness from Fitbit; recovery and strain from WHOOP when connected.
         </p>

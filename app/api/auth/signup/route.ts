@@ -6,6 +6,9 @@ import { prisma } from "@/lib/db";
 import { createSession } from "@/lib/auth";
 
 const SignupSchema = z.object({
+  firstName: z.string().trim().min(1).max(40),
+  lastName: z.string().trim().min(1).max(40),
+  timezone: z.string().trim().min(1).max(80),
   email: z.string().email(),
   password: z.string().min(8),
   next: z.string().optional(),
@@ -14,6 +17,9 @@ const SignupSchema = z.object({
 export async function POST(req: Request) {
   const form = await req.formData();
   const parsed = SignupSchema.safeParse({
+    firstName: form.get("firstName"),
+    lastName: form.get("lastName"),
+    timezone: form.get("timezone"),
     email: form.get("email"),
     password: form.get("password"),
     next: form.get("next") ?? undefined,
@@ -26,7 +32,7 @@ export async function POST(req: Request) {
     return redirectTo("/signup?error=Invalid%20input");
   }
 
-  const { email, password, next } = parsed.data;
+  const { firstName, lastName, timezone, email, password, next } = parsed.data;
   const normalizedEmail = email.toLowerCase();
 
   const existing = await prisma().user.findUnique({
@@ -38,9 +44,11 @@ export async function POST(req: Request) {
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma().user.create({
     data: {
+      firstName,
+      lastName,
       email: normalizedEmail,
       passwordHash,
-      timezone: "UTC",
+      timezone,
     },
     select: { id: true },
   });

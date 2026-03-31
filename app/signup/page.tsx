@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getTimezones } from "@/lib/timezones";
 
 export default function SignupPage({
   searchParams,
@@ -8,6 +9,9 @@ export default function SignupPage({
   searchParams?: { next?: string; error?: string };
 }) {
   const next = searchParams?.next ?? "/overview";
+  const timezones = getTimezones();
+  const defaultTimezone =
+    Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
   return (
     <div className="dashboard-bg min-h-dvh px-6 py-14">
@@ -37,6 +41,28 @@ export default function SignupPage({
 
             <form action="/api/auth/signup" method="post" className="space-y-3">
               <input type="hidden" name="next" value={next} />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                    First name
+                  </div>
+                  <input
+                    name="firstName"
+                    required
+                    className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  />
+                </label>
+                <label className="block">
+                  <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                    Last name
+                  </div>
+                  <input
+                    name="lastName"
+                    required
+                    className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  />
+                </label>
+              </div>
               <label className="block">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Email
@@ -59,6 +85,27 @@ export default function SignupPage({
                   minLength={8}
                   className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
                 />
+              </label>
+              <label className="block">
+                <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                  Timezone
+                </div>
+                <select
+                  name="timezone"
+                  required
+                  defaultValue={
+                    timezones.some((tz) => tz.value === defaultTimezone)
+                      ? defaultTimezone
+                      : "UTC"
+                  }
+                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                >
+                  {timezones.map((tz) => (
+                    <option key={tz.value} value={tz.value}>
+                      {tz.label}
+                    </option>
+                  ))}
+                </select>
               </label>
               <button className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800">
                 Create account
