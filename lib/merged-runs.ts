@@ -48,6 +48,33 @@ export async function fetchNormalizedRunsInRange(
   return out;
 }
 
+/** Strava runs only (excludes Fitbit exercise logs). Use for dashboards aligned with Strava + WHOOP. */
+export async function fetchStravaRunsInRange(
+  userId: string,
+  start: Date,
+  end: Date = new Date(),
+): Promise<NormalizedRun[]> {
+  const strava = await prisma().stravaActivity.findMany({
+    where: {
+      userId,
+      startAt: { gte: start, lte: end },
+      OR: [{ type: "Run" }, { sportType: "Run" }],
+    },
+    select: {
+      startAt: true,
+      distanceMeters: true,
+      movingTimeSec: true,
+    },
+  });
+  const out: NormalizedRun[] = strava.map((r) => ({
+    startAt: r.startAt,
+    distanceMeters: r.distanceMeters,
+    movingTimeSec: r.movingTimeSec,
+  }));
+  out.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+  return out;
+}
+
 export type RunTableRow = {
   rowKey: string;
   source: "STRAVA" | "FITBIT";

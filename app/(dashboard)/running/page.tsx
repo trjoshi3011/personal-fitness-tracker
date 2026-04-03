@@ -7,7 +7,7 @@ import { RunningChat } from "@/components/dashboard/running-chat";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import {
-  fetchNormalizedRunsInRange,
+  fetchStravaRunsInRange,
   fetchRecentRunTableRows,
 } from "@/lib/merged-runs";
 import { chartPalette } from "@/lib/chart-palette";
@@ -33,7 +33,7 @@ export default async function RunningPage() {
   const start30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   const [runs7, recentRuns, whoop7, whoop30] = await Promise.all([
-    fetchNormalizedRunsInRange(userId, start7, now),
+    fetchStravaRunsInRange(userId, start7, now),
     fetchRecentRunTableRows(userId, 30),
     prisma().dailyWhoopStat.findMany({
       where: { userId, date: { gte: start7 } },
@@ -120,15 +120,15 @@ export default async function RunningPage() {
         <p className="text-sm tracking-widest text-stone-500 uppercase">Training</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Running</h1>
         <p className="mt-2 text-base leading-relaxed text-stone-600">
-          Runs from Strava and Fitbit exercise logs. WHOOP shows how recovered you were for the same window — useful next to training volume.
+          Runs from Strava (with historical Fitbit logs). WHOOP recovery and strain show how your body handles the training load.
         </p>
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Runs" value={String(runCount)} hint="Strava + Fitbit · 7d" />
-        <StatCard title="Distance" value={`${metersToMiles(totalMeters).toFixed(1)} mi`} hint="Strava + Fitbit · 7d" />
-        <StatCard title="Avg pace" value={avgPace} hint="Strava + Fitbit · 7d" />
-        <StatCard title="Longest run" value={`${metersToMiles(longestMeters).toFixed(1)} mi`} hint="Strava + Fitbit · 7d" />
+        <StatCard title="Runs" value={String(runCount)} hint="Strava · 7d" />
+        <StatCard title="Distance" value={`${metersToMiles(totalMeters).toFixed(1)} mi`} hint="Strava · 7d" />
+        <StatCard title="Avg pace" value={avgPace} hint="Strava · 7d" />
+        <StatCard title="Longest run" value={`${metersToMiles(longestMeters).toFixed(1)} mi`} hint="Strava · 7d" />
       </section>
 
       <div>
@@ -172,31 +172,29 @@ export default async function RunningPage() {
         </ChartCard>
       </section>
 
-      {whoop30.length > 0 && (
-        <section>
-          <ChartCard
-            title="WHOOP recovery vs strain"
-            description="Daily physiological load vs readiness · last 30 days (not per-run)"
-          >
-            <MultiLineChartView
-              data={whoopRecStrainChart}
-              xKey="day"
-              lines={[
-                { dataKey: "recovery", color: "#22c55e", name: "Recovery %", yAxisId: "left" },
-                { dataKey: "strain", color: chartPalette.adobe, name: "Strain", yAxisId: "right" },
-              ]}
-              yDomain={[0, 100]}
-              rightYDomain={[0, "dataMax"]}
-              height={220}
-            />
-          </ChartCard>
-        </section>
-      )}
+      <section>
+        <ChartCard
+          title="WHOOP recovery vs strain"
+          description="Daily physiological load vs readiness · last 30 days"
+        >
+          <MultiLineChartView
+            data={whoopRecStrainChart}
+            xKey="day"
+            lines={[
+              { dataKey: "recovery", color: "#22c55e", name: "Recovery %", yAxisId: "left" },
+              { dataKey: "strain", color: chartPalette.adobe, name: "Strain", yAxisId: "right" },
+            ]}
+            yDomain={[0, 100]}
+            rightYDomain={[0, "dataMax"]}
+            height={220}
+          />
+        </ChartCard>
+      </section>
 
       <section>
         <ChartCard
           title="Recent runs"
-          description="Last 30 runs (Strava + Fitbit logs), newest first"
+          description="Last 30 runs (Strava + historical Fitbit logs), newest first"
           contentClassName="pt-0"
         >
           <div className="overflow-x-auto">

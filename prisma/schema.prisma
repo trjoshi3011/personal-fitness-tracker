@@ -156,6 +156,9 @@ model DailyWhoopStat {
   sleepEfficiencyPct      Float?
   sleepConsistencyPct     Float?
 
+  // From GET /v2/user/measurement/body (weight_kilogram), stamped on rows when synced
+  weightKg Float?
+
   rawPayload Json?
 
   sourceConnectedAccountId String?
@@ -279,6 +282,7 @@ model MonthlyFitnessSnapshot {
   avgWhoopStrain   Float?
   avgWhoopHrvMs    Float?
   whoopDaysCount   Int?
+  avgWhoopWeightKg Float?
 
   computedAt DateTime @default(now())
   updatedAt  DateTime @updatedAt

@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   });
   if (existing) return redirectTo("/login?error=Account%20already%20exists");
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await bcrypt.hash(password, 10);
   const user = await prisma().user.create({
     data: {
       firstName,

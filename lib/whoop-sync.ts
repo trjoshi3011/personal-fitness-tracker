@@ -145,6 +145,23 @@ export async function syncWhoopDailyStats({
   const startIso = windowStartAt.toISOString();
   const endIso = windowEndAt.toISOString();
 
+  let profileWeightKg: number | null = null;
+  try {
+    const body = (await whoopGetJson(
+      "/v2/user/measurement/body",
+      accessToken,
+    )) as { weight_kilogram?: number };
+    if (
+      typeof body.weight_kilogram === "number" &&
+      Number.isFinite(body.weight_kilogram) &&
+      body.weight_kilogram > 0
+    ) {
+      profileWeightKg = body.weight_kilogram;
+    }
+  } catch {
+    // Missing read:body_measurement scope or API error — leave weight null
+  }
+
   const cycleCache = new Map<number, CycleRow>();
 
   const map = new Map<string, DayAgg>();
@@ -284,6 +301,7 @@ export async function syncWhoopDailyStats({
         sleepPerformancePct: agg.sleepPerformancePct,
         sleepEfficiencyPct: agg.sleepEfficiencyPct,
         sleepConsistencyPct: agg.sleepConsistencyPct,
+        weightKg: profileWeightKg,
         rawPayload: agg.raw as object,
         sourceConnectedAccountId: connectedAccountId,
       },
@@ -298,6 +316,7 @@ export async function syncWhoopDailyStats({
         sleepPerformancePct: agg.sleepPerformancePct,
         sleepEfficiencyPct: agg.sleepEfficiencyPct,
         sleepConsistencyPct: agg.sleepConsistencyPct,
+        ...(profileWeightKg != null ? { weightKg: profileWeightKg } : {}),
         rawPayload: agg.raw as object,
         sourceConnectedAccountId: connectedAccountId,
       },

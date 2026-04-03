@@ -1,7 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import { GoogleGenAI } from "@google/genai";
 import { prisma } from "@/lib/db";
-import { fetchNormalizedRunsInRange } from "@/lib/merged-runs";
+import { fetchStravaRunsInRange } from "@/lib/merged-runs";
+import { utcCalendarWindowBoundsMs } from "@/lib/calendar-range";
 import { metersToMiles, paceSecondsPerMile, kgToLb } from "@/lib/units";
 
 const MODEL = "gemini-3-flash-preview";
@@ -43,6 +44,7 @@ const monthlySnapshotSelectWithWhoop = {
   avgWhoopStrain: true,
   avgWhoopHrvMs: true,
   whoopDaysCount: true,
+  avgWhoopWeightKg: true,
 } as const;
 
 export type MonthlySnapshotInsightRow =
@@ -72,7 +74,8 @@ async function fetchMonthlySnapshotsForInsights(
     if (
       msg.includes("Unknown field") ||
       msg.includes("avgWhoop") ||
-      msg.includes("whoopDaysCount")
+      msg.includes("whoopDaysCount") ||
+      msg.includes("avgWhoopWeightKg")
     ) {
       const rows = await prisma().monthlyFitnessSnapshot.findMany({
         ...args,
@@ -86,28 +89,26 @@ async function fetchMonthlySnapshotsForInsights(
 
 async function gatherUserData(userId: string) {
   const now = new Date();
-  const start30 = new Date(now.getTime() - 30 * 86_400_000);
+  const { startMs, endMs } = utcCalendarWindowBoundsMs(30, now);
+  const rangeStart = new Date(startMs);
+  const rangeEnd = new Date(endMs);
   const start7 = new Date(now.getTime() - 7 * 86_400_000);
 
   const [runs30, fitbit30, whoop30, fitbit7, whoop7, monthlySnapshots] =
     await Promise.all([
-      fetchNormalizedRunsInRange(userId, start30, now),
+      fetchStravaRunsInRange(userId, rangeStart, rangeEnd),
       prisma().dailyFitbitStat.findMany({
-        where: { userId, date: { gte: start30 } },
+        where: { userId, date: { gte: rangeStart, lte: rangeEnd } },
         select: {
           date: true,
-          steps: true,
           sleepMinutes: true,
           sleepEfficiency: true,
           restingHeartRateBpm: true,
-          activeMinutes: true,
-          caloriesOut: true,
-          weightKg: true,
         },
         orderBy: { date: "asc" },
       }),
       prisma().dailyWhoopStat.findMany({
-        where: { userId, date: { gte: start30 } },
+        where: { userId, date: { gte: rangeStart, lte: rangeEnd } },
         select: {
           date: true,
           recoveryScore: true,
@@ -120,6 +121,7 @@ async function gatherUserData(userId: string) {
           sleepPerformancePct: true,
           sleepEfficiencyPct: true,
           sleepConsistencyPct: true,
+          weightKg: true,
         },
         orderBy: { date: "asc" },
       }),
@@ -127,7 +129,6 @@ async function gatherUserData(userId: string) {
         where: { userId, date: { gte: start7 } },
         select: {
           date: true,
-          steps: true,
           sleepMinutes: true,
           restingHeartRateBpm: true,
         },
@@ -147,8 +148,12 @@ async function gatherUserData(userId: string) {
       fetchMonthlySnapshotsForInsights(userId),
     ]);
 
+  const runsFiltered = runs30.filter(
+    (r) => r.startAt.getTime() >= startMs && r.startAt.getTime() <= endMs,
+  );
+
   return {
-    runs30,
+    runs30: runsFiltered,
     fitbit30,
     whoop30,
     fitbit7,
@@ -202,14 +207,7 @@ function buildDataSummary(data: Awaited<ReturnType<typeof gatherUserData>>) {
 
   // --- Fitbit ---
   if (data.fitbit30.length > 0) {
-    lines.push(`\n## Fitbit daily stats (last 30 days, ${data.fitbit30.length} days with data)`);
-    const steps = data.fitbit30.filter((r) => r.steps != null);
-    if (steps.length > 0) {
-      const avg = Math.round(
-        steps.reduce((a, r) => a + (r.steps ?? 0), 0) / steps.length,
-      );
-      lines.push(`- Avg steps/day: ${avg.toLocaleString()}`);
-    }
+    lines.push(`\n## Fitbit daily stats — HISTORICAL (last 30 days, ${data.fitbit30.length} days with data)`);
     const sleep = data.fitbit30.filter(
       (r) => r.sleepMinutes != null && r.sleepMinutes > 0,
     );
@@ -249,41 +247,11 @@ function buildDataSummary(data: Awaited<ReturnType<typeof gatherUserData>>) {
         `- RHR: avg ${avgRhr} bpm, early window avg ${Math.round(rhrFirst5)}, recent avg ${Math.round(rhrLast5)}`,
       );
     }
-    const wt = data.fitbit30.filter(
-      (r) => r.weightKg != null && r.weightKg > 0,
-    );
-    if (wt.length > 0) {
-      const first = kgToLb(wt[0].weightKg!);
-      const last = kgToLb(wt[wt.length - 1].weightKg!);
-      lines.push(
-        `- Weight: ${first.toFixed(1)} lb → ${last.toFixed(1)} lb (${wt.length} weigh-ins)`,
-      );
-    }
-    const active = data.fitbit30.filter(
-      (r) => r.activeMinutes != null && r.activeMinutes > 0,
-    );
-    if (active.length > 0) {
-      const avgActive = Math.round(
-        active.reduce((a, r) => a + (r.activeMinutes ?? 0), 0) / active.length,
-      );
-      lines.push(`- Avg active minutes/day: ${avgActive}`);
-    }
-    const cal = data.fitbit30.filter(
-      (r) => r.caloriesOut != null && r.caloriesOut > 0,
-    );
-    if (cal.length > 0) {
-      const avgCal = Math.round(
-        cal.reduce((a, r) => a + (r.caloriesOut ?? 0), 0) / cal.length,
-      );
-      lines.push(`- Avg daily calories burned: ${avgCal}`);
-    }
-
     // 7-day micro view
     if (data.fitbit7.length > 0) {
       lines.push(`\n### Fitbit last 7 days (day-by-day)`);
       for (const d of data.fitbit7) {
         const parts = [fmt(d.date)];
-        if (d.steps != null) parts.push(`${d.steps} steps`);
         if (d.sleepMinutes != null) parts.push(`sleep ${d.sleepMinutes}m`);
         if (d.restingHeartRateBpm != null) parts.push(`RHR ${d.restingHeartRateBpm}`);
         lines.push(`  ${parts.join(" · ")}`);
@@ -293,7 +261,7 @@ function buildDataSummary(data: Awaited<ReturnType<typeof gatherUserData>>) {
 
   // --- WHOOP ---
   if (data.whoop30.length > 0) {
-    lines.push(`\n## WHOOP (last 30 days, ${data.whoop30.length} days with data)`);
+    lines.push(`\n## WHOOP — PRIMARY WEARABLE (last 30 days, ${data.whoop30.length} days with data)`);
     const rec = data.whoop30.filter((r) => r.recoveryScore != null);
     if (rec.length > 0) {
       const avg = Math.round(
@@ -353,6 +321,14 @@ function buildDataSummary(data: Awaited<ReturnType<typeof gatherUserData>>) {
       );
       lines.push(`- WHOOP RHR avg: ${avg} bpm`);
     }
+    const wWt = data.whoop30.filter((r) => r.weightKg != null && r.weightKg > 0);
+    if (wWt.length > 0) {
+      const first = kgToLb(wWt[0].weightKg!);
+      const last = kgToLb(wWt[wWt.length - 1].weightKg!);
+      lines.push(
+        `- Body weight (WHOOP API): ${first.toFixed(1)} lb → ${last.toFixed(1)} lb (${wWt.length} daily rows with weight)`,
+      );
+    }
 
     if (data.whoop7.length > 0) {
       lines.push(`\n### WHOOP last 7 days (day-by-day)`);
@@ -380,7 +356,8 @@ function buildDataSummary(data: Awaited<ReturnType<typeof gatherUserData>>) {
         const ps = Math.round(s.avgPaceSecPerMi % 60);
         parts.push(`pace ${pm}:${String(ps).padStart(2, "0")}`);
       }
-      if (s.avgSteps != null) parts.push(`${Math.round(s.avgSteps)} avg steps`);
+      if (s.avgSteps != null)
+        parts.push(`Fitbit avg steps ${Math.round(s.avgSteps)} (historical)`);
       if (s.avgSleepMinutes != null) {
         const h = Math.floor(s.avgSleepMinutes / 60);
         const m = Math.round(s.avgSleepMinutes % 60);
@@ -389,7 +366,9 @@ function buildDataSummary(data: Awaited<ReturnType<typeof gatherUserData>>) {
       if (s.avgRestingHr != null)
         parts.push(`RHR ${Math.round(s.avgRestingHr)}`);
       if (s.avgWeightKg != null)
-        parts.push(`${kgToLb(s.avgWeightKg).toFixed(1)} lb`);
+        parts.push(`Fitbit weight (historical) ${kgToLb(s.avgWeightKg).toFixed(1)} lb`);
+      if (s.avgWhoopWeightKg != null)
+        parts.push(`WHOOP weight avg ${kgToLb(s.avgWhoopWeightKg).toFixed(1)} lb`);
       if (s.avgWhoopRecovery != null)
         parts.push(`WHOOP recovery ${Math.round(s.avgWhoopRecovery)}%`);
       if (s.avgWhoopStrain != null)
@@ -405,9 +384,9 @@ function buildDataSummary(data: Awaited<ReturnType<typeof gatherUserData>>) {
   return lines.join("\n");
 }
 
-const SYSTEM_PROMPT = `You are an expert sports-science coach and wellness analyst integrated into a personal fitness dashboard. The user has wearable data from Fitbit, WHOOP, and Strava.
+const SYSTEM_PROMPT = `You are an expert sports-science coach and wellness analyst integrated into a personal fitness dashboard. The user's primary wearable is WHOOP (recovery, strain, HRV, sleep, RHR, body weight from WHOOP body-measurement API). Runs come from Strava. Historical Fitbit data (sleep, RHR) may supplement older periods. WHOOP does not expose step counts via API — do not infer steps from WHOOP.
 
-Your job is to analyze the data holistically and produce **actionable, specific insights**. Don't just restate numbers — interpret trends, spot correlations, and give concrete recommendations.
+Your job is to analyze the data holistically and produce **actionable, specific insights**. Don't just restate numbers — interpret trends, spot correlations, and give concrete recommendations. Prioritize WHOOP data for recovery, sleep, and readiness analysis.
 
 Respond with valid JSON matching this schema (no markdown fences, just raw JSON):
 
@@ -428,7 +407,8 @@ Guidelines:
 - "high" priority = needs immediate attention or represents a significant finding.
 - "medium" = notable trend worth monitoring.
 - "low" = positive observation or minor note.
-- If WHOOP data is present, use HRV and recovery scores for recovery analysis.
+- Use WHOOP HRV, recovery scores, and sleep metrics as the primary recovery signals.
+- Fitbit data is historical — use it for long-term trend context but note it's from an older period if relevant. Do not treat steps as a current KPI (WHOOP has no step API).
 - If a data source is missing, skip sections that depend on it — don't hallucinate.
 - Be encouraging but honest. Flag overtraining or under-recovery signals clearly.
 - This is NOT medical advice. Frame it as coaching observation.`;

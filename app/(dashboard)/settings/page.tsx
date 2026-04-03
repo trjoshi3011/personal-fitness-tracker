@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import Link from "next/link";
 import { getRecentStravaActivities } from "@/lib/strava";
-import { metersToMiles, minutesToHhMm } from "@/lib/units";
+import { kgToLb, metersToMiles, minutesToHhMm } from "@/lib/units";
 import { getTimezones } from "@/lib/timezones";
 
 export const dynamic = "force-dynamic";
@@ -85,7 +85,6 @@ export default async function SettingsPage({
           take: 7,
           select: {
             date: true,
-            steps: true,
             sleepMinutes: true,
             restingHeartRateBpm: true,
           },
@@ -104,6 +103,7 @@ export default async function SettingsPage({
             strain: true,
             sleepMinutes: true,
             restingHeartRateBpm: true,
+            weightKg: true,
           },
         })
       : [];
@@ -335,7 +335,7 @@ export default async function SettingsPage({
                 </div>
                 <div className="rounded-xl border border-amber-900/10 bg-card/55 p-4">
                   <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
-                    Recent daily stats (latest 7 in DB)
+                    Recent Fitbit daily rows (historical · latest 7)
                   </div>
                   {recentFitbitDays.length > 0 ? (
                     <ul className="mt-3 space-y-1.5 text-sm">
@@ -348,11 +348,8 @@ export default async function SettingsPage({
                             {row.date.toLocaleDateString()}
                           </span>
                           <span className="text-xs text-stone-500">
-                            {row.steps != null ? `${row.steps.toLocaleString()} steps` : "—"}{" "}
-                            · sleep {minutesToHhMm(row.sleepMinutes)}{" "}
-                            {row.restingHeartRateBpm != null
-                              ? `· RHR ${row.restingHeartRateBpm}`
-                              : ""}
+                            sleep {minutesToHhMm(row.sleepMinutes)}
+                            {row.restingHeartRateBpm != null ? ` · RHR ${row.restingHeartRateBpm}` : ""}
                           </span>
                         </li>
                       ))}
@@ -408,7 +405,8 @@ export default async function SettingsPage({
                   {whoop?.lastSyncedAt
                     ? whoop.lastSyncedAt.toLocaleString()
                     : "never"}
-                  . Sync stores daily recovery, strain, and sleep metrics from WHOOP.
+                  . Sync stores daily recovery, strain, sleep, RHR, and body weight
+                  from WHOOP when available.
                 </div>
                 <div className="rounded-xl border border-amber-900/10 bg-card/55 p-4">
                   <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
@@ -435,6 +433,9 @@ export default async function SettingsPage({
                             {minutesToHhMm(row.sleepMinutes)}
                             {row.restingHeartRateBpm != null
                               ? ` · RHR ${row.restingHeartRateBpm}`
+                              : ""}
+                            {row.weightKg != null && row.weightKg > 0
+                              ? ` · ${kgToLb(row.weightKg).toFixed(1)} lb`
                               : ""}
                           </span>
                         </li>

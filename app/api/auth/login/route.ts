@@ -45,46 +45,46 @@ export async function POST(req: Request) {
 
   await createSession(user.id);
 
-  const stravaAccount = await prisma().connectedAccount.findUnique({
-    where: { userId_provider: { userId: user.id, provider: "STRAVA" } },
-    select: { id: true, isActive: true },
-  });
+  const [stravaAccount, fitbitAccount, whoopAccount] = await Promise.all([
+    prisma().connectedAccount.findUnique({
+      where: { userId_provider: { userId: user.id, provider: "STRAVA" } },
+      select: { id: true, isActive: true },
+    }),
+    prisma().connectedAccount.findUnique({
+      where: { userId_provider: { userId: user.id, provider: "FITBIT" } },
+      select: { id: true, isActive: true },
+    }),
+    prisma().connectedAccount.findUnique({
+      where: { userId_provider: { userId: user.id, provider: "WHOOP" } },
+      select: { id: true, isActive: true },
+    }),
+  ]);
 
   if (stravaAccount?.isActive) {
-    await syncStravaActivitiesWithLog({
+    void syncStravaActivitiesWithLog({
       userId: user.id,
       connectedAccountId: stravaAccount.id,
       days: 90,
       getAccessToken: () => getValidStravaAccessTokenForUser(user.id),
-    });
+    }).catch(() => {});
   }
 
-  const fitbitAccount = await prisma().connectedAccount.findUnique({
-    where: { userId_provider: { userId: user.id, provider: "FITBIT" } },
-    select: { id: true, isActive: true },
-  });
-
   if (fitbitAccount?.isActive) {
-    await syncFitbitDailyStatsWithLog({
+    void syncFitbitDailyStatsWithLog({
       userId: user.id,
       connectedAccountId: fitbitAccount.id,
       days: 90,
       getAccessToken: () => getValidFitbitAccessTokenForUser(user.id),
-    });
+    }).catch(() => {});
   }
 
-  const whoopAccount = await prisma().connectedAccount.findUnique({
-    where: { userId_provider: { userId: user.id, provider: "WHOOP" } },
-    select: { id: true, isActive: true },
-  });
-
   if (whoopAccount?.isActive) {
-    await syncWhoopDailyStatsWithLog({
+    void syncWhoopDailyStatsWithLog({
       userId: user.id,
       connectedAccountId: whoopAccount.id,
       days: 90,
       getAccessToken: () => getValidWhoopAccessTokenForUser(user.id),
-    });
+    }).catch(() => {});
   }
 
   return redirectTo(next && next.startsWith("/") ? next : "/overview");

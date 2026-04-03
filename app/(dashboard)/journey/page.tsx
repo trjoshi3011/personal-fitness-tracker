@@ -6,7 +6,8 @@ import { MultiLineChartView } from "@/components/charts/multi-line-chart";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { chartPalette } from "@/lib/chart-palette";
-import { formatPaceMinPerMile, kgToLb, metersToMiles } from "@/lib/units";
+import { lastNCalendarUtcDaysInclusive } from "@/lib/calendar-range";
+import { formatPaceMinPerMile, kgToLb, metersToMiles, minutesToHhMm } from "@/lib/units";
 
 export const dynamic = "force-dynamic";
 
@@ -17,14 +18,80 @@ function ymLabel(year: number, month: number) {
   });
 }
 
+function isoDay(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
 export default async function JourneyPage() {
   const userId = await requireUserId();
-  const snapshots = await prisma().monthlyFitnessSnapshot.findMany({
-    where: { userId },
-    orderBy: [{ year: "asc" }, { month: "asc" }],
-  });
-
   const now = new Date();
+  const { start: winStart, end: winEnd } = lastNCalendarUtcDaysInclusive(30, now);
+
+  const [snapshots, whoopLast30, fitbitSleep30, whoopSleep30, allFitbitSleep, allWhoopSleep] =
+    await Promise.all([
+      prisma().monthlyFitnessSnapshot.findMany({
+        where: { userId },
+        orderBy: [{ year: "asc" }, { month: "asc" }],
+      }),
+      prisma().dailyWhoopStat.findMany({
+        where: { userId, date: { gte: winStart, lte: winEnd } },
+        select: { recoveryScore: true },
+      }),
+      prisma().dailyFitbitStat.findMany({
+        where: { userId, date: { gte: winStart, lte: winEnd } },
+        select: { date: true, sleepMinutes: true },
+        orderBy: { date: "asc" },
+      }),
+      prisma().dailyWhoopStat.findMany({
+        where: { userId, date: { gte: winStart, lte: winEnd } },
+        select: { date: true, sleepMinutes: true },
+        orderBy: { date: "asc" },
+      }),
+      prisma().dailyFitbitStat.findMany({
+        where: {
+          userId,
+          date: { gte: new Date(Date.UTC(now.getUTCFullYear() - 3, 0, 1)) },
+        },
+        select: { date: true, sleepMinutes: true },
+      }),
+      prisma().dailyWhoopStat.findMany({
+        where: {
+          userId,
+          date: { gte: new Date(Date.UTC(now.getUTCFullYear() - 3, 0, 1)) },
+        },
+        select: { date: true, sleepMinutes: true },
+      }),
+    ]);
+
+  const sleepByDayMerged = new Map<string, number>();
+  for (const r of allFitbitSleep) {
+    if (r.sleepMinutes != null && r.sleepMinutes > 0) sleepByDayMerged.set(isoDay(r.date), r.sleepMinutes);
+  }
+  for (const r of allWhoopSleep) {
+    if (r.sleepMinutes != null && r.sleepMinutes > 0) sleepByDayMerged.set(isoDay(r.date), r.sleepMinutes);
+  }
+  const sleepMonthAgg = new Map<string, { sumMin: number; n: number }>();
+  for (const [dayStr, minutes] of sleepByDayMerged) {
+    const d = new Date(`${dayStr}T12:00:00.000Z`);
+    const key = `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}`;
+    const cur = sleepMonthAgg.get(key) ?? { sumMin: 0, n: 0 };
+    cur.sumMin += minutes;
+    cur.n += 1;
+    sleepMonthAgg.set(key, cur);
+  }
+  const sleepHrs = [...sleepMonthAgg.entries()]
+    .map(([key, v]) => {
+      const [y, m] = key.split("-").map(Number);
+      return {
+        period: ymLabel(y, m),
+        sortKey: y * 100 + m,
+        hours: v.n > 0 ? Number((v.sumMin / v.n / 60).toFixed(2)) : 0,
+      };
+    })
+    .filter((r) => r.hours > 0)
+    .sort((a, b) => a.sortKey - b.sortKey)
+    .map(({ period, hours }) => ({ period, hours }));
+
   const thisYear = now.getFullYear();
   const lastYear = thisYear - 1;
 
@@ -42,18 +109,11 @@ export default async function JourneyPage() {
       pace: Number((s.avgPaceSecPerMi! / 60).toFixed(2)),
     }));
 
-  const sleepHrs = snapshots
-    .filter((s) => s.avgSleepMinutes != null && s.avgSleepMinutes > 0)
-    .map((s) => ({
-      period: ymLabel(s.year, s.month),
-      hours: Number((s.avgSleepMinutes! / 60).toFixed(2)),
-    }));
-
   const weightLb = snapshots
-    .filter((s) => s.avgWeightKg != null && s.avgWeightKg > 0)
+    .filter((s) => s.avgWhoopWeightKg != null && s.avgWhoopWeightKg > 0)
     .map((s) => ({
       period: ymLabel(s.year, s.month),
-      lb: Number(kgToLb(s.avgWeightKg!).toFixed(1)),
+      lb: Number(kgToLb(s.avgWhoopWeightKg!).toFixed(1)),
     }));
 
   const whoopRecovery = snapshots
@@ -112,9 +172,24 @@ export default async function JourneyPage() {
   const latest = snapshots[snapshots.length - 1];
   const monthsTracked = snapshots.length;
 
-  const latestWhoop = [...snapshots]
-    .reverse()
-    .find((s) => (s.whoopDaysCount ?? 0) > 0 && s.avgWhoopRecovery != null);
+  const rec30 = whoopLast30.filter((r) => r.recoveryScore != null);
+  const avgWhoopRecovery30d =
+    rec30.length > 0
+      ? Math.round(rec30.reduce((a, r) => a + (r.recoveryScore ?? 0), 0) / rec30.length)
+      : null;
+
+  const sleep30merge = new Map<string, number>();
+  for (const r of fitbitSleep30) {
+    if (r.sleepMinutes != null && r.sleepMinutes > 0) sleep30merge.set(isoDay(r.date), r.sleepMinutes);
+  }
+  for (const r of whoopSleep30) {
+    if (r.sleepMinutes != null && r.sleepMinutes > 0) sleep30merge.set(isoDay(r.date), r.sleepMinutes);
+  }
+  const sleep30vals = [...sleep30merge.values()];
+  const latestSleepAvgMin =
+    sleep30vals.length > 0
+      ? Math.round(sleep30vals.reduce((a, v) => a + v, 0) / sleep30vals.length)
+      : null;
 
   return (
     <div className="space-y-8">
@@ -122,8 +197,8 @@ export default async function JourneyPage() {
         <p className="text-sm tracking-widest text-stone-500 uppercase">Long-term</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Journey</h1>
         <p className="mt-2 max-w-2xl text-base leading-relaxed text-stone-600">
-          Month-by-month rollups: running volume from Strava and Fitbit exercise logs; sleep, steps, and weight from
-          Fitbit; recovery, strain, and HRV from WHOOP. Snapshots refresh after each sync (Strava, Fitbit, or WHOOP).
+          Month-by-month rollups: running from Strava; WHOOP recovery, strain, HRV, and weight; sleep charts merge
+          WHOOP with historical Fitbit per night then average by month. Snapshots refresh after each sync.
         </p>
       </div>
 
@@ -145,32 +220,24 @@ export default async function JourneyPage() {
               ? formatPaceMinPerMile(latest.avgPaceSecPerMi)
               : "—"
           }
-          hint="Strava + Fitbit · monthly weighted"
+          hint="Strava · monthly weighted"
         />
         <StatCard
-          title="Latest sleep avg"
-          value={
-            latest?.avgSleepMinutes != null && latest.avgSleepMinutes > 0
-              ? `${(latest.avgSleepMinutes / 60).toFixed(1)} h/night`
-              : "—"
-          }
-          hint="Fitbit nights in month"
+          title="Sleep (avg)"
+          value={latestSleepAvgMin != null ? minutesToHhMm(latestSleepAvgMin) : "—"}
+          hint="WHOOP + Fitbit · last 30 UTC days"
         />
         <StatCard
-          title="Latest WHOOP recovery"
-          value={
-            latestWhoop?.avgWhoopRecovery != null
-              ? `${Math.round(latestWhoop.avgWhoopRecovery)}%`
-              : "—"
-          }
-          hint={latestWhoop ? ymLabel(latestWhoop.year, latestWhoop.month) : "Connect WHOOP + sync"}
+          title="WHOOP recovery"
+          value={avgWhoopRecovery30d != null ? `${avgWhoopRecovery30d}%` : "—"}
+          hint="Last 30 UTC calendar days"
         />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <ChartCard
           title="Monthly run volume"
-          description="Strava runs + Fitbit logged runs · miles per calendar month"
+          description="Strava runs · miles per calendar month"
         >
           <BarChartView
             data={runMi}
@@ -183,7 +250,7 @@ export default async function JourneyPage() {
         </ChartCard>
         <ChartCard
           title="Average pace by month"
-          description="Strava + Fitbit · lower is faster"
+          description="Strava · lower is faster"
         >
           <AreaChartView
             data={paceMin}
@@ -201,7 +268,7 @@ export default async function JourneyPage() {
       <section className="grid gap-4 lg:grid-cols-2">
         <ChartCard
           title="Sleep (monthly average)"
-          description="Fitbit · hours per night averaged by month"
+          description="WHOOP + Fitbit · merged nightly sleep, averaged per month"
         >
           <AreaChartView
             data={sleepHrs}
@@ -215,7 +282,7 @@ export default async function JourneyPage() {
         </ChartCard>
         <ChartCard
           title="Body weight (monthly average)"
-          description="Fitbit scale · lb"
+          description="WHOOP body measurement · lb"
         >
           <AreaChartView
             data={weightLb}
@@ -230,56 +297,54 @@ export default async function JourneyPage() {
         </ChartCard>
       </section>
 
-      {whoopRecStrainDual.length > 0 && (
-        <section className="grid gap-4 lg:grid-cols-2">
-          <ChartCard
-            title="WHOOP recovery vs strain"
-            description="Monthly averages · days with WHOOP data in that month"
-            className="lg:col-span-2"
-          >
-            <MultiLineChartView
-              data={whoopRecStrainDual}
-              xKey="period"
-              lines={[
-                { dataKey: "recovery", color: "#22c55e", name: "Recovery %", yAxisId: "left" },
-                { dataKey: "strain", color: chartPalette.adobe, name: "Strain", yAxisId: "right" },
-              ]}
-              yDomain={[0, 100]}
-              rightYDomain={[0, "dataMax"]}
-              height={260}
-            />
-          </ChartCard>
-          <ChartCard title="WHOOP recovery %" description="Monthly average">
-            <AreaChartView
-              data={whoopRecovery}
-              xKey="period"
-              yKey="recovery"
-              color="#22c55e"
-              yUnit="%"
-              gradientId="j-wrec"
-              height={240}
-              yDomain={[0, 100]}
-            />
-          </ChartCard>
-          <ChartCard title="WHOOP HRV" description="Monthly avg RMSSD (ms)">
-            <AreaChartView
-              data={whoopHrv}
-              xKey="period"
-              yKey="hrv"
-              color="#22c55e"
-              yUnit=" ms"
-              gradientId="j-whrv"
-              height={240}
-              yDomain={["dataMin", "dataMax"]}
-            />
-          </ChartCard>
-        </section>
-      )}
+      <section className="grid gap-4 lg:grid-cols-2">
+        <ChartCard
+          title="WHOOP recovery vs strain"
+          description="Monthly averages"
+          className="lg:col-span-2"
+        >
+          <MultiLineChartView
+            data={whoopRecStrainDual}
+            xKey="period"
+            lines={[
+              { dataKey: "recovery", color: "#22c55e", name: "Recovery %", yAxisId: "left" },
+              { dataKey: "strain", color: chartPalette.adobe, name: "Strain", yAxisId: "right" },
+            ]}
+            yDomain={[0, 100]}
+            rightYDomain={[0, "dataMax"]}
+            height={260}
+          />
+        </ChartCard>
+        <ChartCard title="WHOOP recovery %" description="Monthly average">
+          <AreaChartView
+            data={whoopRecovery}
+            xKey="period"
+            yKey="recovery"
+            color="#22c55e"
+            yUnit="%"
+            gradientId="j-wrec"
+            height={240}
+            yDomain={[0, 100]}
+          />
+        </ChartCard>
+        <ChartCard title="WHOOP HRV" description="Monthly avg RMSSD (ms)">
+          <AreaChartView
+            data={whoopHrv}
+            xKey="period"
+            yKey="hrv"
+            color="#22c55e"
+            yUnit=" ms"
+            gradientId="j-whrv"
+            height={240}
+            yDomain={["dataMin", "dataMax"]}
+          />
+        </ChartCard>
+      </section>
 
       <section>
         <ChartCard
           title="Year-over-year run volume"
-          description={`Strava + Fitbit · ${lastYear} vs ${thisYear} (same calendar month)`}
+          description={`Strava · ${lastYear} vs ${thisYear} (same calendar month)`}
         >
           <MultiLineChartView
             data={yoyData}

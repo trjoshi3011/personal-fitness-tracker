@@ -26,6 +26,7 @@ type WhoopMonthRow = {
   avgWhoopRecovery: number | null;
   avgWhoopStrain: number | null;
   avgWhoopHrvMs: number | null;
+  avgWhoopWeightKg: number | null;
   whoopDaysCount: number;
 };
 
@@ -94,6 +95,7 @@ export async function recomputeMonthlyFitnessSnapshots(userId: string) {
       AVG("recoveryScore")::float AS "avgWhoopRecovery",
       AVG(strain)::float AS "avgWhoopStrain",
       AVG("hrvRmssdMs")::float AS "avgWhoopHrvMs",
+      AVG("weightKg") FILTER (WHERE "weightKg" IS NOT NULL)::float AS "avgWhoopWeightKg",
       COUNT(*)::int AS "whoopDaysCount"
     FROM "DailyWhoopStat"
     WHERE "userId" = ${userId}
@@ -138,6 +140,7 @@ export async function recomputeMonthlyFitnessSnapshots(userId: string) {
       avgWhoopStrain: w?.avgWhoopStrain ?? null,
       avgWhoopHrvMs: w?.avgWhoopHrvMs ?? null,
       whoopDaysCount: w?.whoopDaysCount ?? null,
+      avgWhoopWeightKg: w?.avgWhoopWeightKg ?? null,
     };
   });
 

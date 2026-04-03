@@ -5,7 +5,7 @@ import { AreaChartView } from "@/components/charts/area-chart";
 import { MultiLineChartView } from "@/components/charts/multi-line-chart";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
-import { fetchNormalizedRunsInRange } from "@/lib/merged-runs";
+import { fetchStravaRunsInRange } from "@/lib/merged-runs";
 import { chartPalette } from "@/lib/chart-palette";
 import {
   formatPaceMinPerMile,
@@ -41,20 +41,15 @@ export default async function OverviewPage() {
   const start7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const start30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [user, activities7, fitbitWeek, fitbit30, whoopWeek, whoop30] = await Promise.all([
+  const [user, activities7, fitbit30, whoopWeek, whoop30] = await Promise.all([
     prisma().user.findUnique({
       where: { id: userId },
       select: { firstName: true, timezone: true },
     }),
-    fetchNormalizedRunsInRange(userId, start7, now),
-    prisma().dailyFitbitStat.findMany({
-      where: { userId, date: { gte: start7 } },
-      select: { date: true, steps: true, sleepMinutes: true, restingHeartRateBpm: true },
-      orderBy: { date: "asc" },
-    }),
+    fetchStravaRunsInRange(userId, start7, now),
     prisma().dailyFitbitStat.findMany({
       where: { userId, date: { gte: start30 } },
-      select: { date: true, steps: true, sleepMinutes: true, restingHeartRateBpm: true },
+      select: { date: true, sleepMinutes: true, restingHeartRateBpm: true },
       orderBy: { date: "asc" },
     }),
     prisma().dailyWhoopStat.findMany({
@@ -64,6 +59,8 @@ export default async function OverviewPage() {
         recoveryScore: true,
         strain: true,
         hrvRmssdMs: true,
+        sleepMinutes: true,
+        restingHeartRateBpm: true,
       },
       orderBy: { date: "asc" },
     }),
@@ -74,6 +71,8 @@ export default async function OverviewPage() {
         recoveryScore: true,
         strain: true,
         hrvRmssdMs: true,
+        sleepMinutes: true,
+        restingHeartRateBpm: true,
       },
       orderBy: { date: "asc" },
     }),
@@ -83,15 +82,26 @@ export default async function OverviewPage() {
   const totalSeconds = activities7.reduce((a, r) => a + (r.movingTimeSec ?? 0), 0);
   const miles = metersToMiles(totalMeters);
   const pace = formatPaceMinPerMile(paceSecondsPerMile({ seconds: totalSeconds, meters: totalMeters }));
-  const totalSteps = fitbitWeek.reduce((a, r) => a + (r.steps ?? 0), 0);
-  const sleepRows = fitbitWeek.filter((r) => r.sleepMinutes != null && r.sleepMinutes > 0);
-  const sleepAvgMin = sleepRows.length > 0
-    ? Math.round(sleepRows.reduce((a, r) => a + (r.sleepMinutes ?? 0), 0) / sleepRows.length)
-    : null;
-  const rhrRows = fitbitWeek.filter((r) => r.restingHeartRateBpm != null && r.restingHeartRateBpm > 0);
-  const rhrAvg = rhrRows.length > 0
-    ? Math.round(rhrRows.reduce((a, r) => a + (r.restingHeartRateBpm ?? 0), 0) / rhrRows.length)
-    : null;
+
+  // Sleep (30d): WHOOP primary, Fitbit fallback — same merge as Recovery
+  const sleepByDay30 = new Map<string, number>();
+  for (const r of fitbit30) {
+    if (r.sleepMinutes != null && r.sleepMinutes > 0) sleepByDay30.set(isoDay(r.date), r.sleepMinutes);
+  }
+  for (const r of whoop30) {
+    if (r.sleepMinutes != null && r.sleepMinutes > 0) sleepByDay30.set(isoDay(r.date), r.sleepMinutes);
+  }
+  const mergedSleep30 = [...sleepByDay30.values()];
+  const sleepAvgMin =
+    mergedSleep30.length > 0
+      ? Math.round(mergedSleep30.reduce((a, v) => a + v, 0) / mergedSleep30.length)
+      : null;
+
+  const rhrRows7 = whoopWeek.filter((r) => r.restingHeartRateBpm != null && r.restingHeartRateBpm > 0);
+  const rhrAvg =
+    rhrRows7.length > 0
+      ? Math.round(rhrRows7.reduce((a, r) => a + (r.restingHeartRateBpm ?? 0), 0) / rhrRows7.length)
+      : null;
 
   const whoopRec = whoopWeek.filter((r) => r.recoveryScore != null);
   const whoopAvgRecovery =
@@ -100,16 +110,11 @@ export default async function OverviewPage() {
       : null;
   const whoopStr = whoopWeek.filter((r) => r.strain != null);
   const whoopAvgStrain =
-    whoopStr.length > 0
-      ? whoopStr.reduce((a, r) => a + (r.strain ?? 0), 0) / whoopStr.length
-      : null;
+    whoopStr.length > 0 ? whoopStr.reduce((a, r) => a + (r.strain ?? 0), 0) / whoopStr.length : null;
   const whoopHrv = whoopWeek.filter((r) => r.hrvRmssdMs != null && r.hrvRmssdMs > 0);
   const whoopAvgHrv =
-    whoopHrv.length > 0
-      ? whoopHrv.reduce((a, r) => a + (r.hrvRmssdMs ?? 0), 0) / whoopHrv.length
-      : null;
+    whoopHrv.length > 0 ? whoopHrv.reduce((a, r) => a + (r.hrvRmssdMs ?? 0), 0) / whoopHrv.length : null;
 
-  // Distance by day (bar chart) — Strava + Fitbit exercise logs
   const distByDay = new Map<string, { label: string; mi: number }>();
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
@@ -125,23 +130,36 @@ export default async function OverviewPage() {
     mi: Number(d.mi.toFixed(2)),
   }));
 
-  const stepsData = fitbitWeek.map((r) => ({
-    day: dayLabel(r.date),
-    steps: r.steps ?? 0,
-  }));
-
-  const sleepData = fitbit30
-    .filter((r) => r.sleepMinutes != null && r.sleepMinutes > 0)
-    .map((r) => ({
-      day: r.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      hours: Number(((r.sleepMinutes ?? 0) / 60).toFixed(1)),
+  const sleepByDay30Chart = new Map<string, { date: Date; minutes: number }>();
+  for (const r of fitbit30) {
+    if (r.sleepMinutes != null && r.sleepMinutes > 0)
+      sleepByDay30Chart.set(isoDay(r.date), { date: r.date, minutes: r.sleepMinutes });
+  }
+  for (const r of whoop30) {
+    if (r.sleepMinutes != null && r.sleepMinutes > 0)
+      sleepByDay30Chart.set(isoDay(r.date), { date: r.date, minutes: r.sleepMinutes });
+  }
+  const sleepData = [...sleepByDay30Chart.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => ({
+      day: v.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      hours: Number((v.minutes / 60).toFixed(1)),
     }));
 
-  const rhrData = fitbit30
-    .filter((r) => r.restingHeartRateBpm != null && r.restingHeartRateBpm > 0)
-    .map((r) => ({
-      day: r.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      bpm: r.restingHeartRateBpm,
+  const rhrByDay30 = new Map<string, { date: Date; bpm: number }>();
+  for (const r of fitbit30) {
+    if (r.restingHeartRateBpm != null && r.restingHeartRateBpm > 0)
+      rhrByDay30.set(isoDay(r.date), { date: r.date, bpm: r.restingHeartRateBpm });
+  }
+  for (const r of whoop30) {
+    if (r.restingHeartRateBpm != null && r.restingHeartRateBpm > 0)
+      rhrByDay30.set(isoDay(r.date), { date: r.date, bpm: r.restingHeartRateBpm });
+  }
+  const rhrData = [...rhrByDay30.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => ({
+      day: v.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      bpm: v.bpm,
     }));
 
   const whoopRecStrainData = whoop30
@@ -178,20 +196,21 @@ export default async function OverviewPage() {
           {greeting}, {firstName}
         </h1>
         <p className="mt-2 text-base leading-relaxed text-stone-600">
-          Runs from Strava and Fitbit logs; daily wellness from Fitbit; recovery and strain from WHOOP when connected.
+          Running from Strava; recovery, strain, and HRV from WHOOP; sleep (30-day average) merges WHOOP with historical
+          Fitbit where available.
         </p>
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Distance" value={`${miles.toFixed(1)} mi`} hint="Strava + Fitbit · 7d" />
-        <StatCard title="Time" value={secondsToHhMm(totalSeconds)} hint="Strava + Fitbit · 7d" />
-        <StatCard title="Avg pace" value={pace} hint="Strava + Fitbit · 7d" />
-        <StatCard title="Steps" value={totalSteps > 0 ? totalSteps.toLocaleString() : "—"} hint="Fitbit · 7d" />
+        <StatCard title="Distance" value={`${miles.toFixed(1)} mi`} hint="Strava · 7d" />
+        <StatCard title="Time" value={secondsToHhMm(totalSeconds)} hint="Strava · 7d" />
+        <StatCard title="Avg pace" value={pace} hint="Strava · 7d" />
+        <StatCard title="Runs" value={String(activities7.length)} hint="Strava · 7d" />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <StatCard title="Sleep (avg)" value={minutesToHhMm(sleepAvgMin)} hint="Fitbit · 7d" />
-        <StatCard title="Resting HR" value={rhrAvg != null ? `${rhrAvg} bpm` : "—"} hint="Fitbit · 7d avg" />
+        <StatCard title="Sleep (avg)" value={minutesToHhMm(sleepAvgMin)} hint="WHOOP + Fitbit · 30d" />
+        <StatCard title="Resting HR" value={rhrAvg != null ? `${rhrAvg} bpm` : "—"} hint="WHOOP · 7d avg" />
         <StatCard
           title="Recovery"
           value={whoopAvgRecovery != null ? `${whoopAvgRecovery}%` : "—"}
@@ -209,23 +228,24 @@ export default async function OverviewPage() {
         />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        <ChartCard title="Distance by day" description="Miles from runs · Strava + Fitbit" className="lg:col-span-2">
+      <section className="grid gap-4 lg:grid-cols-2">
+        <ChartCard title="Distance by day" description="Miles from Strava runs · 7d" className="lg:col-span-2">
           <BarChartView data={distData} xKey="day" yKey="mi" color={chartPalette.amazon} yUnit=" mi" />
-        </ChartCard>
-        <ChartCard title="Steps by day" description="Fitbit daily steps">
-          <BarChartView data={stepsData} xKey="day" yKey="steps" color={chartPalette.cal} />
         </ChartCard>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <ChartCard
           title="Sleep"
-          description={sleepAvgMin != null ? `Fitbit · ~${minutesToHhMm(sleepAvgMin)} avg · 30d` : "Connect Fitbit for sleep"}
+          description={
+            sleepAvgMin != null
+              ? `WHOOP + Fitbit · ~${minutesToHhMm(sleepAvgMin)} avg · 30d`
+              : "No sleep in the last 30 days"
+          }
         >
           <AreaChartView data={sleepData} xKey="day" yKey="hours" color={chartPalette.un} yUnit=" h" gradientId="sleep" />
         </ChartCard>
-        <ChartCard title="Resting heart rate" description="Fitbit · 30d">
+        <ChartCard title="Resting heart rate" description="WHOOP + Fitbit · 30d">
           <AreaChartView
             data={rhrData}
             xKey="day"
@@ -238,35 +258,33 @@ export default async function OverviewPage() {
         </ChartCard>
       </section>
 
-      {whoop30.length > 0 && (
-        <section className="grid gap-4 lg:grid-cols-2">
-          <ChartCard title="WHOOP recovery vs strain" description="Daily scores · last 30 days">
-            <MultiLineChartView
-              data={whoopRecStrainData}
-              xKey="day"
-              lines={[
-                { dataKey: "recovery", color: "#22c55e", name: "Recovery %", yAxisId: "left" },
-                { dataKey: "strain", color: chartPalette.adobe, name: "Strain", yAxisId: "right" },
-              ]}
-              yDomain={[0, 100]}
-              rightYDomain={[0, "dataMax"]}
-              height={220}
-            />
-          </ChartCard>
-          <ChartCard title="Heart rate variability" description="WHOOP HRV (RMSSD) · 30d">
-            <AreaChartView
-              data={whoopHrvData}
-              xKey="day"
-              yKey="hrv"
-              color="#22c55e"
-              yUnit=" ms"
-              gradientId="ov-hrv"
-              height={220}
-              yDomain={["dataMin", "dataMax"]}
-            />
-          </ChartCard>
-        </section>
-      )}
+      <section className="grid gap-4 lg:grid-cols-2">
+        <ChartCard title="WHOOP recovery vs strain" description="Daily scores · last 30 days">
+          <MultiLineChartView
+            data={whoopRecStrainData}
+            xKey="day"
+            lines={[
+              { dataKey: "recovery", color: "#22c55e", name: "Recovery %", yAxisId: "left" },
+              { dataKey: "strain", color: chartPalette.adobe, name: "Strain", yAxisId: "right" },
+            ]}
+            yDomain={[0, 100]}
+            rightYDomain={[0, "dataMax"]}
+            height={220}
+          />
+        </ChartCard>
+        <ChartCard title="Heart rate variability" description="WHOOP HRV (RMSSD) · 30d">
+          <AreaChartView
+            data={whoopHrvData}
+            xKey="day"
+            yKey="hrv"
+            color="#22c55e"
+            yUnit=" ms"
+            gradientId="ov-hrv"
+            height={220}
+            yDomain={["dataMin", "dataMax"]}
+          />
+        </ChartCard>
+      </section>
     </div>
   );
 }
