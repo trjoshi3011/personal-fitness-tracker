@@ -1,11 +1,18 @@
 import { ChartCard } from "@/components/dashboard/chart-card";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { CombinedMonthCalendar } from "@/components/dashboard/combined-month-calendar";
 import { BarChartView } from "@/components/charts/bar-chart";
 import { AreaChartView } from "@/components/charts/area-chart";
 import { MultiLineChartView } from "@/components/charts/multi-line-chart";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
-import { fetchStravaRunsInRange } from "@/lib/merged-runs";
+import { fetchStravaRunsInRange, fetchStravaRunStartsInRange } from "@/lib/merged-runs";
+import { WHOOP_LIFTING_SPORT_NAMES } from "@/lib/whoop-lifting-sports";
+import {
+  activeZonedDaysOfMonth,
+  parseCalendarYearMonth,
+  zonedMonthRangeUtc,
+} from "@/lib/zoned-calendar";
 import { chartPalette } from "@/lib/chart-palette";
 import {
   formatPaceMinPerMile,
@@ -35,7 +42,12 @@ function getGreeting(hour: number) {
   return "Good Evening";
 }
 
-export default async function OverviewPage() {
+export default async function OverviewPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ y?: string; m?: string }>;
+}) {
+  const sp = (await searchParams) ?? {};
   const userId = await requireUserId();
   const now = new Date();
   const start7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -178,6 +190,25 @@ export default async function OverviewPage() {
     }));
 
   const tz = user?.timezone?.trim() || "UTC";
+  const cal = parseCalendarYearMonth(sp, tz);
+  const monthRange = zonedMonthRangeUtc(cal.year, cal.month1, tz);
+
+  const [runStartsMonth, liftStartsMonth] = await Promise.all([
+    fetchStravaRunStartsInRange(userId, monthRange.start, monthRange.end),
+    prisma().whoopWorkout.findMany({
+      where: {
+        userId,
+        startAt: { gte: monthRange.start, lt: monthRange.end },
+        sportName: { in: [...WHOOP_LIFTING_SPORT_NAMES] },
+      },
+      select: { startAt: true },
+      orderBy: { startAt: "asc" },
+    }).then((rows) => rows.map((r) => r.startAt)),
+  ]);
+
+  const activeRunDays = activeZonedDaysOfMonth(runStartsMonth, tz, cal.year, cal.month1);
+  const activeLiftDays = activeZonedDaysOfMonth(liftStartsMonth, tz, cal.year, cal.month1);
+
   const localHour = Number(
     new Intl.DateTimeFormat("en-US", {
       hour: "numeric",
@@ -228,10 +259,18 @@ export default async function OverviewPage() {
         />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-4 lg:grid-cols-3">
         <ChartCard title="Distance by day" description="Miles from Strava runs · 7d" className="lg:col-span-2">
           <BarChartView data={distData} xKey="day" yKey="mi" color={chartPalette.amazon} yUnit=" mi" />
         </ChartCard>
+        <CombinedMonthCalendar
+          basePath="/overview"
+          year={cal.year}
+          month1={cal.month1}
+          timeZone={tz}
+          runDays={activeRunDays}
+          liftDays={activeLiftDays}
+        />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">

@@ -18,6 +18,7 @@ type SettingsSearch = {
   whoopSync?: string;
   fetched?: string;
   upserted?: string;
+  workoutsUpserted?: string;
   profile?: string;
   password?: string;
 };
@@ -183,8 +184,12 @@ export default async function SettingsPage({
           ) : null}
           {sp.whoopSync === "ok" ? (
             <p>
-              WHOOP sync finished (fetched {sp.fetched ?? "—"}, saved{" "}
-              {sp.upserted ?? "—"} daily rows).
+              WHOOP sync finished (recovery: fetched {sp.fetched ?? "—"}, saved{" "}
+              {sp.upserted ?? "—"} daily rows
+              {sp.workoutsUpserted != null && sp.workoutsUpserted !== "0"
+                ? ` · workouts saved ${sp.workoutsUpserted}`
+                : ""}
+              ).
             </p>
           ) : null}
           {sp.whoopSync === "error" ? (
@@ -405,8 +410,8 @@ export default async function SettingsPage({
                   {whoop?.lastSyncedAt
                     ? whoop.lastSyncedAt.toLocaleString()
                     : "never"}
-                  . Sync stores daily recovery, strain, sleep, RHR, and body weight
-                  from WHOOP when available.
+                  . Sync stores daily recovery, strain, sleep, RHR, body weight, and
+                  workout activities (when read:workout is granted) from WHOOP.
                 </div>
                 <div className="rounded-xl border border-amber-900/10 bg-card/55 p-4">
                   <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">

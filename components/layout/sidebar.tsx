@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  Dumbbell,
   Gauge,
   HeartPulse,
   LineChart,
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/overview", label: "Overview", icon: Gauge },
   { href: "/running", label: "Running", icon: Activity },
+  { href: "/lifting", label: "Lifting", icon: Dumbbell },
   { href: "/recovery", label: "Recovery", icon: HeartPulse },
   { href: "/insights", label: "Insights", icon: LineChart },
   { href: "/journey", label: "Journey", icon: TrendingUp },

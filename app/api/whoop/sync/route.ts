@@ -55,6 +55,7 @@ export async function POST(req: Request) {
       whoopSync: "ok",
       fetched: String(result.fetched),
       upserted: String(result.upserted),
+      workoutsUpserted: String(result.workoutsUpserted),
     });
   }
 
@@ -63,5 +64,7 @@ export async function POST(req: Request) {
     fetched: result.fetched,
     upserted: result.upserted,
     days: result.days,
+    workoutsFetched: result.workoutsFetched,
+    workoutsUpserted: result.workoutsUpserted,
   });
 }

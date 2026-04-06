@@ -156,3 +156,21 @@ export async function fetchRecentRunTableRows(
   rows.sort((a, b) => b.startAt.getTime() - a.startAt.getTime());
   return rows.slice(0, take);
 }
+
+/** Strava runs only — start times for calendar markers. */
+export async function fetchStravaRunStartsInRange(
+  userId: string,
+  start: Date,
+  end: Date,
+): Promise<Date[]> {
+  const rows = await prisma().stravaActivity.findMany({
+    where: {
+      userId,
+      startAt: { gte: start, lt: end },
+      OR: [{ type: "Run" }, { sportType: "Run" }],
+    },
+    select: { startAt: true },
+    orderBy: { startAt: "asc" },
+  });
+  return rows.map((r) => r.startAt);
+}

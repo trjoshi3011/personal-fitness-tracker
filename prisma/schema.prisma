@@ -25,6 +25,7 @@ model User {
   firstName String?
   lastName  String?
   timezone  String   @default("UTC")
+  runningShoeStartDate DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -37,6 +38,7 @@ model User {
   syncLogs                 SyncLog[]
   sessions                 Session[]
   monthlyFitnessSnapshots  MonthlyFitnessSnapshot[]
+  whoopWorkouts            WhoopWorkout[]
 
   @@index([createdAt])
 }
@@ -88,6 +90,7 @@ model ConnectedAccount {
   dailyWhoopStats  DailyWhoopStat[]
   fitbitActivityLogs FitbitActivityLog[]
   stravaActivities StravaActivity[]
+  whoopWorkouts    WhoopWorkout[]
   syncLogs         SyncLog[]
 
   @@unique([provider, providerAccountId])
@@ -172,6 +175,48 @@ model DailyWhoopStat {
   @@unique([userId, date])
   @@index([userId, date])
   @@index([date])
+}
+
+// WHOOP workouts from GET /v2/activity/workout (read:workout). Includes strain, HR, zones, etc.
+model WhoopWorkout {
+  id     String @id @default(cuid())
+  userId String
+
+  providerWorkoutId String
+
+  startAt DateTime
+  endAt   DateTime
+
+  timezoneOffset String?
+  sportName      String
+  sportId        Int?
+  scoreState     String
+
+  strain              Float?
+  averageHeartRateBpm Int?
+  maxHeartRateBpm     Int?
+  kilojoule           Float?
+  percentRecorded     Float?
+  distanceMeters      Float?
+  altitudeGainMeters  Float?
+  altitudeChangeMeters Float?
+
+  zoneDurations Json?
+
+  rawPayload Json?
+
+  sourceConnectedAccountId String?
+  connectedAccount         ConnectedAccount? @relation(fields: [sourceConnectedAccountId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, providerWorkoutId])
+  @@index([userId, startAt])
+  @@index([userId, sportName])
+  @@index([startAt])
 }
 
 model StravaActivity {

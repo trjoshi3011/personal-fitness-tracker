@@ -1,15 +1,24 @@
 import { ChartCard } from "@/components/dashboard/chart-card";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { ActivityMonthCalendar } from "@/components/dashboard/activity-month-calendar";
 import { AreaChartView } from "@/components/charts/area-chart";
 import { BarChartView } from "@/components/charts/bar-chart";
 import { MultiLineChartView } from "@/components/charts/multi-line-chart";
 import { RunningChat } from "@/components/dashboard/running-chat";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
+import type { NormalizedRun, RunTableRow } from "@/lib/merged-runs";
 import {
   fetchStravaRunsInRange,
   fetchRecentRunTableRows,
+  fetchStravaRunStartsInRange,
 } from "@/lib/merged-runs";
+import {
+  activeZonedDaysOfMonth,
+  localCalendarParts,
+  parseCalendarYearMonth,
+  zonedMonthRangeUtc,
+} from "@/lib/zoned-calendar";
 import { chartPalette } from "@/lib/chart-palette";
 import {
   formatPaceMinPerMile,
@@ -26,13 +35,47 @@ function shortDay(d: Date) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export default async function RunningPage() {
+function toDateInputValue(d: Date, timeZone: string) {
+  const p = localCalendarParts(d, timeZone);
+  const y = String(p.y).padStart(4, "0");
+  const m = String(p.m).padStart(2, "0");
+  const day = String(p.d).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export default async function RunningPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ y?: string; m?: string; shoe?: string; reason?: string }>;
+}) {
+  const sp = (await searchParams) ?? {};
   const userId = await requireUserId();
   const now = new Date();
   const start7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const start30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [runs7, recentRuns, whoop7, whoop30] = await Promise.all([
+  const user = await prisma().user.findUnique({
+    where: { id: userId },
+    select: { timezone: true, runningShoeStartDate: true },
+  });
+  const tz = user?.timezone?.trim() || "UTC";
+  const cal = parseCalendarYearMonth(sp, tz);
+  const monthRange = zonedMonthRangeUtc(cal.year, cal.month1, tz);
+
+  const [runs7, recentRuns, whoop7, whoop30]: [
+    NormalizedRun[],
+    RunTableRow[],
+    {
+      recoveryScore: number | null;
+      strain: number | null;
+      hrvRmssdMs: number | null;
+    }[],
+    {
+      date: Date;
+      recoveryScore: number | null;
+      strain: number | null;
+    }[],
+  ] = await Promise.all([
     fetchStravaRunsInRange(userId, start7, now),
     fetchRecentRunTableRows(userId, 30),
     prisma().dailyWhoopStat.findMany({
@@ -49,6 +92,13 @@ export default async function RunningPage() {
       orderBy: { date: "asc" },
     }),
   ]);
+  const runStartsMonth = await fetchStravaRunStartsInRange(
+    userId,
+    monthRange.start,
+    monthRange.end,
+  );
+
+  const activeRunDays = activeZonedDaysOfMonth(runStartsMonth, tz, cal.year, cal.month1);
 
   const runCount = runs7.length;
   const totalMeters = runs7.reduce((acc, r) => acc + (r.distanceMeters ?? 0), 0);
@@ -114,6 +164,30 @@ export default async function RunningPage() {
       max: r.maxHrBpm,
     }));
 
+  const SHOE_LIMIT_MI = 450;
+  const shoeStart = user?.runningShoeStartDate ?? null;
+  const shoeMilesMi =
+    shoeStart != null
+      ? await prisma().stravaActivity
+          .aggregate({
+            where: {
+              userId,
+              startAt: { gte: shoeStart, lte: now },
+              OR: [{ type: "Run" }, { sportType: "Run" }],
+            },
+            _sum: { distanceMeters: true },
+          })
+          .then((r: { _sum: { distanceMeters: number | null } }) =>
+            metersToMiles(r._sum.distanceMeters ?? 0),
+          )
+      : null;
+  const shoeRemainingMi =
+    shoeMilesMi != null ? Math.max(0, SHOE_LIMIT_MI - shoeMilesMi) : null;
+  const shoePct =
+    shoeMilesMi != null
+      ? Math.max(0, Math.min(100, (shoeMilesMi / SHOE_LIMIT_MI) * 100))
+      : null;
+
   return (
     <div className="space-y-8">
       <div>
@@ -152,13 +226,21 @@ export default async function RunningPage() {
             yDomain={["dataMin", "dataMax"]}
           />
         </ChartCard>
+        <ActivityMonthCalendar
+          basePath="/running"
+          year={cal.year}
+          month1={cal.month1}
+          timeZone={tz}
+          activeDays={activeRunDays}
+          legendLabel="run"
+        />
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
         <ChartCard title="Distance per run" description="Miles per run">
           <BarChartView data={distPerRun} xKey="date" yKey="mi" color={chartPalette.amazon} yUnit=" mi" />
         </ChartCard>
-      </section>
-
-      <section>
-        <ChartCard title="Heart rate" description="Per run · Strava & Fitbit logs with HR" contentClassName="pt-0">
+        <ChartCard title="Heart rate" description="Per run · Strava & Fitbit logs with HR">
           <MultiLineChartView
             data={hrData}
             xKey="date"
@@ -172,10 +254,11 @@ export default async function RunningPage() {
         </ChartCard>
       </section>
 
-      <section>
+      <section className="grid gap-4 lg:grid-cols-3">
         <ChartCard
           title="WHOOP recovery vs strain"
           description="Daily physiological load vs readiness · last 30 days"
+          className="lg:col-span-2"
         >
           <MultiLineChartView
             data={whoopRecStrainChart}
@@ -188,6 +271,60 @@ export default async function RunningPage() {
             rightYDomain={[0, "dataMax"]}
             height={220}
           />
+        </ChartCard>
+
+        <ChartCard
+          title="Shoe tracker"
+          description="Strava run miles since new-shoes date · replace ~450 mi"
+          contentClassName="pt-0"
+        >
+          <div className="space-y-4">
+            <form action="/api/running/shoes" method="post" className="space-y-2">
+              <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                New shoes date
+              </div>
+              <input
+                type="date"
+                name="shoeStartDate"
+                defaultValue={shoeStart ? toDateInputValue(shoeStart, tz) : ""}
+                className="h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+              />
+              <button
+                type="submit"
+                className="h-10 w-full rounded-xl border border-amber-900/15 bg-gradient-to-r from-amber-50/70 via-yellow-50/60 to-rose-50/60 px-3 text-sm font-medium text-stone-800 transition-colors hover:bg-amber-50/60"
+              >
+                Save
+              </button>
+              {sp.shoe === "saved" ? (
+                <div className="text-xs text-stone-500">Saved.</div>
+              ) : sp.shoe === "cleared" ? (
+                <div className="text-xs text-stone-500">Cleared.</div>
+              ) : sp.shoe === "error" ? (
+                <div className="text-xs text-rose-700">
+                  Could not save date{sp.reason ? `: ${sp.reason}` : ""}.
+                </div>
+              ) : null}
+            </form>
+
+            <div className="rounded-xl border border-amber-900/10 bg-card/60 p-3">
+              <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                Miles on shoe
+              </div>
+              <div className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">
+                {shoeMilesMi != null ? shoeMilesMi.toFixed(1) : "—"}
+              </div>
+              <div className="mt-2 h-2 w-full rounded-full bg-stone-100/60">
+                <div
+                  className="h-2 rounded-full bg-gradient-to-r from-amber-500/55 via-yellow-500/45 to-rose-400/45"
+                  style={{ width: `${shoePct ?? 0}%` }}
+                  aria-hidden="true"
+                />
+              </div>
+              <div className="mt-2 text-[10px] text-stone-400">
+                Remaining: {shoeRemainingMi != null ? shoeRemainingMi.toFixed(1) : "—"} mi · Benchmark {SHOE_LIMIT_MI} mi
+              </div>
+            </div>
+          </div>
         </ChartCard>
       </section>
 
