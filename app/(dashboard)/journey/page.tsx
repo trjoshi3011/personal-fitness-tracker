@@ -22,13 +22,40 @@ function isoDay(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
+function weekStartMondayUtc(date: Date) {
+  const d = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0),
+  );
+  const dow = d.getUTCDay(); // 0=Sun..6=Sat
+  const delta = (dow + 6) % 7; // days since Monday
+  d.setUTCDate(d.getUTCDate() - delta);
+  return d;
+}
+
+function weekLabel(d: Date) {
+  return `Week of ${d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "2-digit",
+  })}`;
+}
+
 export default async function JourneyPage() {
   const userId = await requireUserId();
   const now = new Date();
   const { start: winStart, end: winEnd } = lastNCalendarUtcDaysInclusive(30, now);
 
-  const [snapshots, whoopLast30, fitbitSleep30, whoopSleep30, allFitbitSleep, allWhoopSleep] =
-    await Promise.all([
+  const threeYearsAgo = new Date(Date.UTC(now.getUTCFullYear() - 3, 0, 1));
+
+  const [
+    snapshots,
+    whoopLast30,
+    fitbitSleep30,
+    whoopSleep30,
+    allFitbitSleep,
+    allWhoopSleep,
+    allWhoopDaily,
+  ] = await Promise.all([
       prisma().monthlyFitnessSnapshot.findMany({
         where: { userId },
         orderBy: [{ year: "asc" }, { month: "asc" }],
@@ -48,18 +75,22 @@ export default async function JourneyPage() {
         orderBy: { date: "asc" },
       }),
       prisma().dailyFitbitStat.findMany({
-        where: {
-          userId,
-          date: { gte: new Date(Date.UTC(now.getUTCFullYear() - 3, 0, 1)) },
-        },
+        where: { userId, date: { gte: threeYearsAgo } },
         select: { date: true, sleepMinutes: true },
       }),
       prisma().dailyWhoopStat.findMany({
-        where: {
-          userId,
-          date: { gte: new Date(Date.UTC(now.getUTCFullYear() - 3, 0, 1)) },
-        },
+        where: { userId, date: { gte: threeYearsAgo } },
         select: { date: true, sleepMinutes: true },
+      }),
+      prisma().dailyWhoopStat.findMany({
+        where: { userId, date: { gte: threeYearsAgo } },
+        select: {
+          date: true,
+          weightKg: true,
+          recoveryScore: true,
+          strain: true,
+          hrvRmssdMs: true,
+        },
       }),
     ]);
 
@@ -109,33 +140,76 @@ export default async function JourneyPage() {
       pace: Number((s.avgPaceSecPerMi! / 60).toFixed(2)),
     }));
 
-  const weightLb = snapshots
-    .filter((s) => s.avgWhoopWeightKg != null && s.avgWhoopWeightKg > 0)
-    .map((s) => ({
-      period: ymLabel(s.year, s.month),
-      lb: Number(kgToLb(s.avgWhoopWeightKg!).toFixed(1)),
+  type WhoopWeekBucket = {
+    sumKg: number;
+    nKg: number;
+    sumRec: number;
+    nRec: number;
+    sumStrain: number;
+    nStrain: number;
+    sumHrv: number;
+    nHrv: number;
+  };
+  const emptyBucket = (): WhoopWeekBucket => ({
+    sumKg: 0, nKg: 0, sumRec: 0, nRec: 0, sumStrain: 0, nStrain: 0, sumHrv: 0, nHrv: 0,
+  });
+
+  const whoopWeekBuckets = new Map<number, WhoopWeekBucket>();
+  for (const r of allWhoopDaily) {
+    const wkKey = weekStartMondayUtc(r.date).getTime();
+    const b = whoopWeekBuckets.get(wkKey) ?? emptyBucket();
+
+    if (r.weightKg != null && Number.isFinite(r.weightKg) && r.weightKg > 0) {
+      b.sumKg += r.weightKg;
+      b.nKg += 1;
+    }
+    if (r.recoveryScore != null && Number.isFinite(r.recoveryScore)) {
+      b.sumRec += r.recoveryScore;
+      b.nRec += 1;
+    }
+    if (r.strain != null && Number.isFinite(r.strain)) {
+      b.sumStrain += r.strain;
+      b.nStrain += 1;
+    }
+    if (r.hrvRmssdMs != null && Number.isFinite(r.hrvRmssdMs)) {
+      b.sumHrv += r.hrvRmssdMs;
+      b.nHrv += 1;
+    }
+
+    whoopWeekBuckets.set(wkKey, b);
+  }
+
+  const sortedWeekKeys = [...whoopWeekBuckets.entries()].sort(
+    ([a], [b]) => a - b,
+  );
+
+  const weightLb = sortedWeekKeys
+    .filter(([, b]) => b.nKg > 0)
+    .map(([k, b]) => ({
+      period: weekLabel(new Date(k)),
+      lb: Number(kgToLb(b.sumKg / b.nKg).toFixed(1)),
     }));
 
-  const whoopRecovery = snapshots
-    .filter((s) => s.avgWhoopRecovery != null && (s.whoopDaysCount ?? 0) > 0)
-    .map((s) => ({
-      period: ymLabel(s.year, s.month),
-      recovery: Math.round(s.avgWhoopRecovery!),
+  const whoopRecovery = sortedWeekKeys
+    .filter(([, b]) => b.nRec > 0)
+    .map(([k, b]) => ({
+      period: weekLabel(new Date(k)),
+      recovery: Math.round(b.sumRec / b.nRec),
     }));
 
-  const whoopHrv = snapshots
-    .filter((s) => s.avgWhoopHrvMs != null && (s.whoopDaysCount ?? 0) > 0)
-    .map((s) => ({
-      period: ymLabel(s.year, s.month),
-      hrv: Math.round(s.avgWhoopHrvMs!),
+  const whoopHrv = sortedWeekKeys
+    .filter(([, b]) => b.nHrv > 0)
+    .map(([k, b]) => ({
+      period: weekLabel(new Date(k)),
+      hrv: Math.round(b.sumHrv / b.nHrv),
     }));
 
-  const whoopRecStrainDual = snapshots
-    .filter((s) => (s.whoopDaysCount ?? 0) > 0 && (s.avgWhoopRecovery != null || s.avgWhoopStrain != null))
-    .map((s) => ({
-      period: ymLabel(s.year, s.month),
-      recovery: s.avgWhoopRecovery != null ? Math.round(s.avgWhoopRecovery) : null,
-      strain: s.avgWhoopStrain != null ? Number(s.avgWhoopStrain.toFixed(1)) : null,
+  const whoopRecStrainDual = sortedWeekKeys
+    .filter(([, b]) => b.nRec > 0 || b.nStrain > 0)
+    .map(([k, b]) => ({
+      period: weekLabel(new Date(k)),
+      recovery: b.nRec > 0 ? Math.round(b.sumRec / b.nRec) : null,
+      strain: b.nStrain > 0 ? Number((b.sumStrain / b.nStrain).toFixed(1)) : null,
     }));
 
   const monthShort = [
@@ -197,8 +271,8 @@ export default async function JourneyPage() {
         <p className="text-sm tracking-widest text-stone-500 uppercase">Long-term</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Journey</h1>
         <p className="mt-2 max-w-2xl text-base leading-relaxed text-stone-600">
-          Month-by-month rollups: running from Strava; WHOOP recovery, strain, HRV, and weight; sleep charts merge
-          WHOOP with historical Fitbit per night then average by month. Snapshots refresh after each sync.
+          Long-term trends: running from Strava (monthly); WHOOP recovery, strain, HRV, and weight (weekly averages);
+          sleep charts merge WHOOP with historical Fitbit per night then average by month. Data refreshes after each sync.
         </p>
       </div>
 
@@ -281,8 +355,8 @@ export default async function JourneyPage() {
           />
         </ChartCard>
         <ChartCard
-          title="Body weight (monthly average)"
-          description="WHOOP body measurement · lb"
+          title="Body weight (weekly average)"
+          description="WHOOP body measurement · lb · averaged by week"
         >
           <AreaChartView
             data={weightLb}
@@ -300,7 +374,7 @@ export default async function JourneyPage() {
       <section className="grid gap-4 lg:grid-cols-2">
         <ChartCard
           title="WHOOP recovery vs strain"
-          description="Monthly averages"
+          description="Weekly averages"
           className="lg:col-span-2"
         >
           <MultiLineChartView
@@ -315,7 +389,7 @@ export default async function JourneyPage() {
             height={260}
           />
         </ChartCard>
-        <ChartCard title="WHOOP recovery %" description="Monthly average">
+        <ChartCard title="WHOOP recovery %" description="Weekly average">
           <AreaChartView
             data={whoopRecovery}
             xKey="period"
@@ -327,7 +401,7 @@ export default async function JourneyPage() {
             yDomain={[0, 100]}
           />
         </ChartCard>
-        <ChartCard title="WHOOP HRV" description="Monthly avg RMSSD (ms)">
+        <ChartCard title="WHOOP HRV" description="Weekly avg RMSSD (ms)">
           <AreaChartView
             data={whoopHrv}
             xKey="period"

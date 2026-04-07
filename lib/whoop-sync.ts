@@ -477,7 +477,6 @@ export async function syncWhoopDailyStats({
         sleepPerformancePct: agg.sleepPerformancePct,
         sleepEfficiencyPct: agg.sleepEfficiencyPct,
         sleepConsistencyPct: agg.sleepConsistencyPct,
-        weightKg: profileWeightKg,
         rawPayload: agg.raw as object,
         sourceConnectedAccountId: connectedAccountId,
       },
@@ -492,13 +491,33 @@ export async function syncWhoopDailyStats({
         sleepPerformancePct: agg.sleepPerformancePct,
         sleepEfficiencyPct: agg.sleepEfficiencyPct,
         sleepConsistencyPct: agg.sleepConsistencyPct,
-        ...(profileWeightKg != null ? { weightKg: profileWeightKg } : {}),
         rawPayload: agg.raw as object,
         sourceConnectedAccountId: connectedAccountId,
       },
       select: { id: true },
     });
     upserted += 1;
+  }
+
+  // Weight is a point-in-time measurement. Store the current weight on the user's
+  // current local day (day of the pull) instead of stamping the whole window.
+  if (profileWeightKg != null) {
+    const todayLocal = isoToUserLocalUtcDate(new Date().toISOString(), tz);
+    await prisma().dailyWhoopStat.upsert({
+      where: { userId_date: { userId, date: todayLocal } },
+      create: {
+        userId,
+        date: todayLocal,
+        weightKg: profileWeightKg,
+        rawPayload: { whoop_body_measurement: { weightKg: profileWeightKg } } as object,
+        sourceConnectedAccountId: connectedAccountId,
+      },
+      update: {
+        weightKg: profileWeightKg,
+        sourceConnectedAccountId: connectedAccountId,
+      },
+      select: { id: true },
+    });
   }
 
   let workoutsFetched = 0;

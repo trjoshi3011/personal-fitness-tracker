@@ -86,6 +86,45 @@ export function zonedWeekdaySunday0(d: Date, tz: string): number {
   return map[w] ?? 0;
 }
 
+/** Monday 00:00 (wall clock in `tz`) for the ISO week that contains `d`. */
+export function startOfZonedWeekMondayContaining(d: Date, tz: string): Date {
+  const p = localCalendarParts(d, tz);
+  const dayStart = startOfZonedCalendarDay(p.y, p.m, p.d, tz);
+  const wd = zonedWeekdaySunday0(dayStart, tz);
+  const daysSinceMonday = wd === 0 ? 6 : wd - 1;
+  return new Date(dayStart.getTime() - daysSinceMonday * 86_400_000);
+}
+
+export function formatZonedDateKey(y: number, month1: number, day: number): string {
+  return `${y}-${String(month1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Add calendar days in `tz` by shifting UTC ms (good enough for week grids). */
+export function zonedDatePlusDays(
+  y: number,
+  month1: number,
+  day: number,
+  deltaDays: number,
+  tz: string,
+): { y: number; m: number; d: number } {
+  const base = startOfZonedCalendarDay(y, month1, day, tz);
+  return localCalendarParts(new Date(base.getTime() + deltaDays * 86_400_000), tz);
+}
+
+export function parseIsoDateOnlyInTz(
+  s: string,
+  tz: string,
+): { date: Date; key: string; y: number; m: number; d: number } | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  const date = startOfZonedCalendarDay(y, mo, d, tz);
+  return { date, key: formatZonedDateKey(y, mo, d), y, m: mo, d };
+}
+
 export function zonedMonthGridMeta(year: number, month1: number, tz: string) {
   const daysInMonth = daysInZonedMonth(year, month1, tz);
   const firstOfMonth = startOfZonedCalendarDay(year, month1, 1, tz);
