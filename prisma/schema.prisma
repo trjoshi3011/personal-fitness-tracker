@@ -18,6 +18,13 @@ enum SyncStatus {
   FAILED
 }
 
+/// User-assigned lifting split on a WHOOP strength workout.
+enum LiftSessionTemplate {
+  PUSH
+  PULL
+  LEGS
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -40,6 +47,8 @@ model User {
   monthlyFitnessSnapshots  MonthlyFitnessSnapshot[]
   whoopWorkouts            WhoopWorkout[]
   trainingPlanWeeks        TrainingPlanWeek[]
+  liftSessionLogs          LiftSessionLog[]
+  liftSplitWeeklyTarget    LiftSplitWeeklyTarget?
 
   @@index([createdAt])
 }
@@ -204,6 +213,9 @@ model WhoopWorkout {
 
   zoneDurations Json?
 
+  /// User-assigned split (push / pull / legs). Does not create a second session.
+  liftSessionTemplate LiftSessionTemplate?
+
   rawPayload Json?
 
   sourceConnectedAccountId String?
@@ -214,10 +226,47 @@ model WhoopWorkout {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  liftSessionLogs LiftSessionLog[]
+
   @@unique([userId, providerWorkoutId])
   @@index([userId, startAt])
   @@index([userId, sportName])
   @@index([startAt])
+}
+
+/// Manual lift structure log: template + optional exercise/rep rows (independent of WHOOP).
+model LiftSessionLog {
+  id        String   @id @default(cuid())
+  userId    String
+  sessionAt DateTime
+  template  LiftSessionTemplate
+  /// [{ "name": "Bench press", "reps": 8 }, ...]
+  exercises Json     @default("[]")
+  notes     String?
+
+  whoopWorkoutId String?
+  whoopWorkout   WhoopWorkout? @relation(fields: [whoopWorkoutId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sessionAt])
+}
+
+/// Weekly targets per split for consistency tracking (0 = not part of plan).
+model LiftSplitWeeklyTarget {
+  id         String @id @default(cuid())
+  userId     String @unique
+  pushTarget Int    @default(0)
+  pullTarget Int    @default(0)
+  legsTarget Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 /// AI-generated Mon–Sun training plan for a user (week anchored to Monday in their timezone).

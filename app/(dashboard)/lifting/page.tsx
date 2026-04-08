@@ -1,20 +1,32 @@
 import { ChartCard } from "@/components/dashboard/chart-card";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { ActivityMonthCalendar } from "@/components/dashboard/activity-month-calendar";
+import type { LiftDayBucket } from "@/components/dashboard/lifting-type-month-calendar";
+import { LiftingTypeMonthCalendar } from "@/components/dashboard/lifting-type-month-calendar";
+import { LiftWeeklyPlanClient } from "@/components/dashboard/lift-weekly-plan-client";
+import { WhoopLiftTypeSelect } from "@/components/dashboard/whoop-lift-type-select";
 import { BarChartView } from "@/components/charts/bar-chart";
 import { MultiLineChartView } from "@/components/charts/multi-line-chart";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { chartPalette } from "@/lib/chart-palette";
+import {
+  emptyTemplateCounts,
+  LIFT_TEMPLATE_KEYS,
+  LIFT_TEMPLATE_LABELS,
+  targetsToRecord,
+  weekConsistencyScore,
+} from "@/lib/lift-session-log";
 import { fetchWhoopLiftingWorkoutsInRange } from "@/lib/whoop-lifting-queries";
 import { WHOOP_LIFTING_SPORT_NAMES } from "@/lib/whoop-lifting-sports";
 import {
   activeZonedDaysOfMonth,
+  localCalendarParts,
   parseCalendarYearMonth,
+  startOfZonedWeekMondayContaining,
   zonedMonthRangeUtc,
 } from "@/lib/zoned-calendar";
 import { secondsToHhMm } from "@/lib/units";
-
 export const dynamic = "force-dynamic";
 
 function shortDay(d: Date) {
@@ -58,7 +70,14 @@ export default async function LiftingPage({
   const cal = parseCalendarYearMonth(sp, tz);
   const monthRange = zonedMonthRangeUtc(cal.year, cal.month1, tz);
 
-  const [lift7, lift30, liftMonth, whoop7, whoop30] = await Promise.all([
+  const [
+    lift7,
+    lift30,
+    liftMonth,
+    whoop7,
+    whoop30,
+    liftSplitTargets,
+  ] = await Promise.all([
     fetchWhoopLiftingWorkoutsInRange(userId, start7, now),
     fetchWhoopLiftingWorkoutsInRange(userId, start30, now),
     fetchWhoopLiftingWorkoutsInRange(userId, monthRange.start, monthRange.end),
@@ -71,7 +90,58 @@ export default async function LiftingPage({
       select: { date: true, recoveryScore: true, strain: true },
       orderBy: { date: "asc" },
     }),
+    prisma().liftSplitWeeklyTarget.findUnique({ where: { userId } }),
   ]);
+
+  const weeklyTargets = liftSplitTargets
+    ? targetsToRecord({
+        pushTarget: liftSplitTargets.pushTarget,
+        pullTarget: liftSplitTargets.pullTarget,
+        legsTarget: liftSplitTargets.legsTarget,
+      })
+    : emptyTemplateCounts();
+
+  const thisMonday = startOfZonedWeekMondayContaining(now, tz);
+  const thisMondayMs = thisMonday.getTime();
+  const thisWeekCounts = emptyTemplateCounts();
+  for (const w of lift30) {
+    if (w.liftSessionTemplate == null) continue;
+    if (startOfZonedWeekMondayContaining(w.startAt, tz).getTime() !== thisMondayMs) {
+      continue;
+    }
+    thisWeekCounts[w.liftSessionTemplate] += 1;
+  }
+
+  const consistencyThisWeek = weekConsistencyScore(
+    thisWeekCounts,
+    weeklyTargets,
+  );
+
+  const initialTargets = liftSplitTargets
+    ? {
+        pushTarget: liftSplitTargets.pushTarget,
+        pullTarget: liftSplitTargets.pullTarget,
+        legsTarget: liftSplitTargets.legsTarget,
+      }
+    : {
+        pushTarget: 0,
+        pullTarget: 0,
+        legsTarget: 0,
+      };
+
+  const liftTypeDayMap = new Map<number, LiftDayBucket>();
+  for (const w of liftMonth) {
+    const p = localCalendarParts(w.startAt, tz);
+    if (p.y !== cal.year || p.m !== cal.month1) continue;
+    const dom = p.d;
+    const cur = liftTypeDayMap.get(dom) ?? { templates: [], untaggedLiftCount: 0 };
+    if (w.liftSessionTemplate) {
+      cur.templates.push(w.liftSessionTemplate);
+    } else {
+      cur.untaggedLiftCount += 1;
+    }
+    liftTypeDayMap.set(dom, cur);
+  }
 
   const activeLiftDays = activeZonedDaysOfMonth(
     liftMonth.map((w) => w.startAt),
@@ -161,7 +231,10 @@ export default async function LiftingPage({
           Strength sessions from WHOOP workouts (
           {WHOOP_LIFTING_SPORT_NAMES.join(", ")}). WHOOP reports workout strain, heart rate,
           energy (kJ), and time in HR zones — not individual lifts or sets. Run a WHOOP sync in
-          Settings to pull workout data from the WHOOP developer workout API.
+          Settings to pull workout data from the WHOOP developer workout API.           Assign each WHOOP lift a{" "}
+          <span className="font-medium text-stone-800">session type</span> (push, pull, or legs) in
+          the table below — it tags that workout only. The month calendar shows which day was which
+          split; weekly plan consistency uses those tags.
         </p>
       </div>
 
@@ -248,10 +321,72 @@ export default async function LiftingPage({
         </ChartCard>
       </section>
 
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch">
+        <ChartCard
+          title="Lift types · month"
+          description="WHOOP strength workouts by day — cell color shows push, pull, or legs (stone = not set yet)"
+          className="flex min-h-0 flex-col lg:col-span-2 lg:h-full"
+          contentClassName="flex min-h-0 flex-1 flex-col pt-0"
+        >
+          <LiftingTypeMonthCalendar
+            year={cal.year}
+            month1={cal.month1}
+            timeZone={tz}
+            dayMap={liftTypeDayMap}
+            className="flex min-h-0 w-full flex-1 flex-col"
+          />
+        </ChartCard>
+        <div className="flex min-h-0 flex-col gap-4 lg:col-span-1 lg:min-h-0 lg:h-full">
+          <StatCard
+            fillHeight
+            className="min-h-0 flex-1"
+            title="This week vs plan"
+            value={
+              consistencyThisWeek != null
+                ? `${Math.round(consistencyThisWeek * 100)}%`
+                : "Set targets"
+            }
+            hint={
+              consistencyThisWeek != null
+                ? "Tagged push/pull/legs this week vs plan (capped at 100%)"
+                : "Set weekly targets and tag workouts below"
+            }
+          />
+          <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-amber-900/10 bg-card/55 p-4 text-sm shadow-sm shadow-yellow-950/[0.04]">
+            <div className="shrink-0 text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+              Current week counts
+            </div>
+            <ul className="mt-3 flex flex-1 flex-col justify-center gap-2 text-stone-700">
+              {LIFT_TEMPLATE_KEYS.map((key) => {
+                const t = weeklyTargets[key];
+                const a = thisWeekCounts[key];
+                const label = LIFT_TEMPLATE_LABELS[key];
+                return (
+                  <li key={key} className="flex justify-between gap-2 text-xs">
+                    <span>{label}</span>
+                    <span className="tabular-nums text-stone-600">
+                      {a}/{t > 0 ? t : "—"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <ChartCard
+        title="Weekly split plan"
+        description="Targets per week; actuals come from session types you set on each WHOOP row"
+        contentClassName="pt-0"
+      >
+        <LiftWeeklyPlanClient initialTargets={initialTargets} />
+      </ChartCard>
+
       <section>
         <ChartCard
           title="Recent strength workouts"
-          description="Last 40 WHOOP sessions in the last 30 days, newest first"
+          description="Last 40 WHOOP sessions in the last 30 days, newest first — set session type per row"
           contentClassName="pt-0"
         >
           <div className="overflow-x-auto">
@@ -259,6 +394,9 @@ export default async function LiftingPage({
               <thead className="text-[10px] tracking-wider text-stone-500 uppercase">
                 <tr>
                   <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">Start</th>
+                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">
+                    Session type
+                  </th>
                   <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">Sport</th>
                   <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Duration</th>
                   <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">Score</th>
@@ -286,6 +424,12 @@ export default async function LiftingPage({
                             hour: "numeric",
                             minute: "2-digit",
                           })}
+                        </td>
+                        <td className="px-3 py-2.5 align-middle">
+                          <WhoopLiftTypeSelect
+                            workoutId={w.id}
+                            initial={w.liftSessionTemplate}
+                          />
                         </td>
                         <td className="px-3 py-2.5">
                           <span className="rounded-md bg-amber-100/80 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-stone-700 uppercase">
@@ -317,7 +461,7 @@ export default async function LiftingPage({
                   })
                 ) : (
                   <tr>
-                    <td colSpan={9} className="px-3 py-6 text-center text-stone-500">
+                    <td colSpan={10} className="px-3 py-6 text-center text-stone-500">
                       No lifting workouts in the last 30 days. Log a strength session on WHOOP (sport
                       weightlifting / powerlifting / etc.) and sync.
                     </td>

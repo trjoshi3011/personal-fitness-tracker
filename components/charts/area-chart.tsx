@@ -52,15 +52,15 @@ export function AreaChartView({
             <stop offset="95%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(120,53,15,0.08)" />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
         <XAxis
           dataKey={xKey}
-          tick={{ fontSize: 11, fill: "#78716c" }}
+          tick={{ fontSize: 11, fill: "var(--chart-axis-text)" }}
           tickLine={false}
           axisLine={false}
         />
         <YAxis
-          tick={{ fontSize: 11, fill: "#78716c" }}
+          tick={{ fontSize: 11, fill: "var(--chart-axis-text)" }}
           tickLine={false}
           axisLine={false}
           domain={yDomain}
@@ -68,10 +68,11 @@ export function AreaChartView({
         />
         <Tooltip
           contentStyle={{
-            backgroundColor: "rgba(255,255,255,0.92)",
-            border: "1px solid rgba(120,53,15,0.12)",
+            backgroundColor: "var(--chart-tooltip-bg)",
+            border: "1px solid var(--chart-tooltip-border)",
             borderRadius: 12,
             fontSize: 12,
+            color: "var(--chart-tooltip-text)",
           }}
         />
         <Area

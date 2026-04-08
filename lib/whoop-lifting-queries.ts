@@ -1,3 +1,5 @@
+import type { LiftSessionTemplate } from "@prisma/client";
+
 import { prisma } from "@/lib/db";
 import { WHOOP_LIFTING_SPORT_NAMES } from "@/lib/whoop-lifting-sports";
 
@@ -13,6 +15,7 @@ export type WhoopLiftingRow = {
   kilojoule: number | null;
   percentRecorded: number | null;
   zoneDurations: unknown;
+  liftSessionTemplate: LiftSessionTemplate | null;
 };
 
 export async function fetchWhoopLiftingWorkoutsInRange(
@@ -39,6 +42,7 @@ export async function fetchWhoopLiftingWorkoutsInRange(
       kilojoule: true,
       percentRecorded: true,
       zoneDurations: true,
+      liftSessionTemplate: true,
     },
   });
 }

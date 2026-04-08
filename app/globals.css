@@ -13,6 +13,18 @@
   --accent: #b45309;
   --accent-foreground: #fff7ed;
   --radius: 16px;
+
+  /* Chart tokens */
+  --chart-volume: #FF9900;
+  --chart-intensity: #FF0000;
+  --chart-recovery: #009EDB;
+  --chart-pace: #FDB515;
+  --chart-body: #efbbcc;
+  --chart-grid: rgba(120, 53, 15, 0.08);
+  --chart-tooltip-bg: rgba(255, 255, 255, 0.92);
+  --chart-tooltip-border: rgba(120, 53, 15, 0.12);
+  --chart-tooltip-text: #1c1917;
+  --chart-axis-text: #78716c;
 }
 
 @theme inline {
@@ -84,4 +96,196 @@ body {
   background-size: 64px 64px;
   mask-image: radial-gradient(circle at 35% 12%, black 0%, transparent 74%);
   opacity: 0.85;
+}
+
+/* ───────────────────────────────────────────────────────────
+   WHOOP dark theme
+   ─────────────────────────────────────────────────────────── */
+
+[data-theme="whoop"] {
+  color-scheme: dark;
+
+  /* Core layout */
+  --background: #111111;
+  --foreground: #e5e5e5;
+  --card: rgba(28, 28, 28, 0.82);
+  --card-foreground: #e5e5e5;
+  --muted: #252525;
+  --muted-foreground: #a3a3a3;
+  --border: rgba(255, 255, 255, 0.08);
+  --ring: rgba(34, 197, 94, 0.4);
+  --accent: #22c55e;
+  --accent-foreground: #ffffff;
+
+  /* Chart tokens — green=good, yellow=medium, red=bad */
+  --chart-volume: #22c55e;
+  --chart-intensity: #ef4444;
+  --chart-recovery: #10b981;
+  --chart-pace: #eab308;
+  --chart-body: #14b8a6;
+  --chart-grid: rgba(255, 255, 255, 0.06);
+  --chart-tooltip-bg: rgba(30, 30, 30, 0.95);
+  --chart-tooltip-border: rgba(255, 255, 255, 0.1);
+  --chart-tooltip-text: #e5e5e5;
+  --chart-axis-text: #a3a3a3;
+
+  /* Stone scale — inverted for dark-mode readability.
+     Low numbers (bg tones) → dark.  High numbers (text tones) → light. */
+  --color-stone-50: #0c0a09;
+  --color-stone-100: #1c1917;
+  --color-stone-200: #292524;
+  --color-stone-300: #44403c;
+  --color-stone-400: #78716c;
+  --color-stone-500: #a8a29e;
+  --color-stone-600: #d6d3d1;
+  --color-stone-700: #e7e5e4;
+  --color-stone-800: #f5f5f4;
+  --color-stone-900: #fafaf9;
+  --color-stone-950: #fafaf9;
+
+  /* Amber → green, inverted for dark mode */
+  --color-amber-50: #052e16;
+  --color-amber-100: #14532d;
+  --color-amber-200: #166534;
+  --color-amber-300: #15803d;
+  --color-amber-400: #16a34a;
+  --color-amber-500: #22c55e;
+  --color-amber-600: #4ade80;
+  --color-amber-700: #86efac;
+  --color-amber-800: #bbf7d0;
+  --color-amber-900: #dcfce7;
+  --color-amber-950: #f0fdf4;
+
+  /* Yellow → green, inverted */
+  --color-yellow-50: #052e16;
+  --color-yellow-100: #14532d;
+  --color-yellow-200: #166534;
+  --color-yellow-300: #15803d;
+  --color-yellow-400: #16a34a;
+  --color-yellow-500: #22c55e;
+  --color-yellow-600: #4ade80;
+  --color-yellow-700: #86efac;
+  --color-yellow-800: #bbf7d0;
+  --color-yellow-900: #dcfce7;
+  --color-yellow-950: #f0fdf4;
+
+  /* Orange → green, inverted */
+  --color-orange-50: #052e16;
+  --color-orange-100: #14532d;
+  --color-orange-200: #166534;
+  --color-orange-300: #15803d;
+  --color-orange-400: #16a34a;
+  --color-orange-500: #22c55e;
+  --color-orange-600: #4ade80;
+  --color-orange-700: #86efac;
+  --color-orange-800: #bbf7d0;
+  --color-orange-900: #dcfce7;
+  --color-orange-950: #f0fdf4;
+
+  /* Rose — keep red hue, inverted lightness for dark bg */
+  --color-rose-50: #4c0519;
+  --color-rose-100: #881337;
+  --color-rose-200: #9f1239;
+  --color-rose-300: #be123c;
+  --color-rose-400: #e11d48;
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #fb7185;
+  --color-rose-700: #fda4af;
+  --color-rose-800: #fecdd3;
+  --color-rose-900: #ffe4e6;
+  --color-rose-950: #fff1f2;
+
+  /* Emerald — keep green hue, inverted lightness */
+  --color-emerald-50: #022c22;
+  --color-emerald-100: #064e3b;
+  --color-emerald-200: #065f46;
+  --color-emerald-300: #047857;
+  --color-emerald-400: #059669;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #34d399;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+  --color-emerald-900: #d1fae5;
+  --color-emerald-950: #ecfdf5;
+}
+
+/* Keep bg-stone-900 dark for buttons / dark surfaces (text-white combos) */
+[data-theme="whoop"] .bg-stone-900 {
+  --color-stone-900: #1c1917;
+}
+[data-theme="whoop"] .hover\:bg-stone-800:hover {
+  --color-stone-800: #292524;
+}
+
+/* WHOOP dashboard background */
+[data-theme="whoop"] .dashboard-bg {
+  background-color: #111111;
+  background-image:
+    radial-gradient(
+      ellipse 140% 90% at 50% -12%,
+      rgba(34, 197, 94, 0.10),
+      transparent 58%
+    ),
+    radial-gradient(
+      1100px 720px at 6% 20%,
+      rgba(34, 197, 94, 0.08),
+      transparent 52%
+    ),
+    radial-gradient(
+      1000px 680px at 94% 16%,
+      rgba(16, 185, 129, 0.07),
+      transparent 54%
+    ),
+    radial-gradient(
+      780px 520px at 50% 44%,
+      rgba(34, 197, 94, 0.05),
+      transparent 66%
+    ),
+    radial-gradient(
+      1200px 820px at 48% 108%,
+      rgba(5, 46, 22, 0.15),
+      transparent 58%
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(10, 20, 14, 0.4) 0%,
+      transparent 44%,
+      rgba(5, 46, 22, 0.08) 100%
+    );
+}
+
+[data-theme="whoop"] .dashboard-grid {
+  background-image:
+    linear-gradient(to right, rgba(34, 197, 94, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34, 197, 94, 0.03) 1px, transparent 1px);
+}
+
+[data-theme="whoop"] ::selection {
+  background: rgba(34, 197, 94, 0.25);
+}
+
+/* Theme picker — uses fixed colors so it's readable in both themes */
+.theme-picker-track {
+  border: 1px solid rgba(120, 120, 120, 0.15);
+  background: rgba(120, 120, 120, 0.06);
+}
+.theme-picker-btn-active {
+  background: rgba(255, 255, 255, 0.85);
+  color: #1c1917;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.theme-picker-btn-inactive {
+  color: #78716c;
+}
+[data-theme="whoop"] .theme-picker-track {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+[data-theme="whoop"] .theme-picker-btn-active {
+  background: rgba(34, 197, 94, 0.15);
+  color: #d1fae5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+[data-theme="whoop"] .theme-picker-btn-inactive {
+  color: #a3a3a3;
 }

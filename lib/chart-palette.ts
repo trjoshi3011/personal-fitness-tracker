@@ -1,14 +1,20 @@
 /**
- * Brand palette — assign by meaning so charts read as a story, not rainbow noise.
- * Amazon: volume & energy · Adobe: intensity & stress · UN: recovery & sleep
- * Cal: speed & pace · Gia: body & heart (softer signals)
+ * Chart color palette — uses CSS custom properties so colors adapt to the
+ * active theme (amber vs WHOOP).  The tokens are defined in globals.css.
+ *
+ * Semantic mapping:
+ *   amazon → volume & energy (amber: orange, whoop: green)
+ *   adobe  → intensity & strain (amber: red, whoop: red)
+ *   un     → recovery & sleep (amber: blue, whoop: emerald)
+ *   cal    → speed & pace (amber: gold, whoop: yellow)
+ *   gia    → body & heart (amber: pink, whoop: teal)
  */
 export const chartPalette = {
-  amazon: "#FF9900",
-  adobe: "#FF0000",
-  un: "#009EDB",
-  cal: "#FDB515",
-  gia: "#efbbcc",
+  amazon: "var(--chart-volume)",
+  adobe: "var(--chart-intensity)",
+  un: "var(--chart-recovery)",
+  cal: "var(--chart-pace)",
+  gia: "var(--chart-body)",
 } as const;
 
 export type ChartSemantic =
@@ -19,7 +25,6 @@ export type ChartSemantic =
   | "body"
   | "secondary";
 
-/** Default stroke/fill per semantic role */
 export function colorForSemantic(role: ChartSemantic): string {
   switch (role) {
     case "volume":
@@ -39,7 +44,6 @@ export function colorForSemantic(role: ChartSemantic): string {
   }
 }
 
-/** Multi-series: order matters for legends (distinct hues). */
 export const seriesByIndex = [
   chartPalette.amazon,
   chartPalette.un,
