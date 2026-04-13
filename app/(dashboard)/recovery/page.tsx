@@ -6,12 +6,10 @@ import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { chartPalette } from "@/lib/chart-palette";
 import { kgToLb, minutesToHhMm } from "@/lib/units";
+import { formatZonedDateShort } from "@/lib/format-zoned";
+import { normalizeUserTimezone } from "@/lib/user-timezone";
 
 export const dynamic = "force-dynamic";
-
-function shortDay(d: Date) {
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 function isoDay(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -19,6 +17,12 @@ function isoDay(d: Date) {
 
 export default async function RecoveryPage() {
   const userId = await requireUserId();
+  const userTz = await prisma().user.findUnique({
+    where: { id: userId },
+    select: { timezone: true },
+  });
+  const tz = normalizeUserTimezone(userTz?.timezone);
+  const shortDay = (d: Date) => formatZonedDateShort(d, tz);
   const now = new Date();
   const start7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const start30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -143,14 +147,14 @@ export default async function RecoveryPage() {
   const sleepData = [...sleepByDay30Chart.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, v]) => ({
-      day: v.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      day: formatZonedDateShort(v.date, tz),
       hours: Number((v.minutes / 60).toFixed(1)),
     }));
 
   const effData = month
     .filter((r) => r.sleepEfficiency != null && r.sleepEfficiency > 0)
     .map((r) => ({
-      day: r.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      day: formatZonedDateShort(r.date, tz),
       efficiency: r.sleepEfficiency,
     }));
 
@@ -166,14 +170,14 @@ export default async function RecoveryPage() {
   const rhrData = [...rhrByDay30.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, v]) => ({
-      day: v.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      day: formatZonedDateShort(v.date, tz),
       bpm: v.bpm,
     }));
 
   const weightData = whoopMonth
     .filter((r) => r.weightKg != null && r.weightKg > 0)
     .map((r) => ({
-      day: r.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      day: formatZonedDateShort(r.date, tz),
       lb: Number(kgToLb(r.weightKg!).toFixed(1)),
     }));
 

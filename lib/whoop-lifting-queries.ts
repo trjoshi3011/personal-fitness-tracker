@@ -27,7 +27,11 @@ export async function fetchWhoopLiftingWorkoutsInRange(
     where: {
       userId,
       startAt: { gte: start, lt: end },
-      sportName: { in: [...WHOOP_LIFTING_SPORT_NAMES] },
+      OR: [
+        { sportName: { in: [...WHOOP_LIFTING_SPORT_NAMES] } },
+        // WHOOP sometimes appends suffixes like `weightlifting_msk`; include all weightlifting variants.
+        { sportName: { startsWith: "weightlifting", mode: "insensitive" } },
+      ],
     },
     orderBy: { startAt: "desc" },
     select: {

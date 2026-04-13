@@ -10,6 +10,8 @@ import {
   mergePlanToExpectedDays,
   twoWeekDateKeysFromMonday,
 } from "@/lib/gemini-training-plan";
+import { formatZonedDateTimeMedium } from "@/lib/format-zoned";
+import { normalizeUserTimezone } from "@/lib/user-timezone";
 import {
   formatZonedDateKey,
   localCalendarParts,
@@ -37,7 +39,7 @@ export default async function TrainingPage({
     where: { id: userId },
     select: { timezone: true },
   });
-  const tz = user?.timezone?.trim() || "UTC";
+  const tz = normalizeUserTimezone(user?.timezone);
 
   let monday: Date;
   if (sp.ws) {
@@ -116,7 +118,7 @@ export default async function TrainingPage({
       >
         {row?.updatedAt ? (
           <p className="mb-3 text-[10px] text-stone-400">
-            Last updated {row.updatedAt.toLocaleString()}
+            Last updated {formatZonedDateTimeMedium(row.updatedAt, tz)}
           </p>
         ) : null}
         <TrainingWeekPlanGrid weekDateKeys={blockDateKeys} plan={displayPlan} />

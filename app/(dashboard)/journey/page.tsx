@@ -8,15 +8,10 @@ import { requireUserId } from "@/lib/auth";
 import { chartPalette } from "@/lib/chart-palette";
 import { lastNCalendarUtcDaysInclusive } from "@/lib/calendar-range";
 import { formatPaceMinPerMile, kgToLb, metersToMiles, minutesToHhMm } from "@/lib/units";
+import { formatZonedWeekOfLine, formatZonedYearMonthShort } from "@/lib/format-zoned";
+import { normalizeUserTimezone } from "@/lib/user-timezone";
 
 export const dynamic = "force-dynamic";
-
-function ymLabel(year: number, month: number) {
-  return new Date(year, month - 1, 1).toLocaleDateString("en-US", {
-    month: "short",
-    year: "2-digit",
-  });
-}
 
 function isoDay(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -32,16 +27,15 @@ function weekStartMondayUtc(date: Date) {
   return d;
 }
 
-function weekLabel(d: Date) {
-  return `Week of ${d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "2-digit",
-  })}`;
-}
-
 export default async function JourneyPage() {
   const userId = await requireUserId();
+  const userTz = await prisma().user.findUnique({
+    where: { id: userId },
+    select: { timezone: true },
+  });
+  const tz = normalizeUserTimezone(userTz?.timezone);
+  const ymLabel = (year: number, month: number) => formatZonedYearMonthShort(year, month, tz);
+  const weekLabel = (d: Date) => formatZonedWeekOfLine(d, tz);
   const now = new Date();
   const { start: winStart, end: winEnd } = lastNCalendarUtcDaysInclusive(30, now);
 

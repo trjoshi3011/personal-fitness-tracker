@@ -5,6 +5,7 @@ import { Dumbbell } from "lucide-react";
 import type { LiftSessionTemplate } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatZonedCalendarMonthTitle } from "@/lib/format-zoned";
 import { LIFT_TEMPLATE_LABELS } from "@/lib/lift-session-log";
 import { shiftZonedMonth, zonedMonthGridMeta } from "@/lib/zoned-calendar";
 
@@ -123,10 +124,7 @@ export function LiftingTypeMonthCalendar({
   const prev = shiftZonedMonth(year, month1, -1);
   const next = shiftZonedMonth(year, month1, 1);
   const qs = (y: number, m: number) => `?y=${y}&m=${m}`;
-  const title = new Date(Date.UTC(year, month1 - 1, 15)).toLocaleDateString(
-    "en-US",
-    { month: "long", year: "numeric", timeZone: "UTC" },
-  );
+  const title = formatZonedCalendarMonthTitle(year, month1, timeZone);
 
   const cells: (number | null)[] = [
     ...Array.from({ length: leadingBlanks }, () => null),

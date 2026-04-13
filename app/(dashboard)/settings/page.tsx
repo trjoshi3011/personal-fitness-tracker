@@ -5,6 +5,8 @@ import Link from "next/link";
 import { getRecentStravaActivities } from "@/lib/strava";
 import { kgToLb, metersToMiles, minutesToHhMm } from "@/lib/units";
 import { getTimezones } from "@/lib/timezones";
+import { formatZonedDateShort, formatZonedDateTimeMedium } from "@/lib/format-zoned";
+import { normalizeUserTimezone } from "@/lib/user-timezone";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,7 @@ export default async function SettingsPage({
     where: { id: userId },
     select: { email: true, firstName: true, lastName: true, timezone: true },
   });
+  const tz = normalizeUserTimezone(user?.timezone);
   const strava = await prisma().connectedAccount.findUnique({
     where: { userId_provider: { userId, provider: "STRAVA" } },
     select: {
@@ -232,7 +235,7 @@ export default async function SettingsPage({
               {isConnected ? (
                 <div className="mt-1 text-xs text-stone-500">
                   Scope: {strava?.scope ?? "unknown"} · Expires:{" "}
-                  {strava?.expiresAt ? strava.expiresAt.toLocaleString() : "unknown"}
+                  {strava?.expiresAt ? formatZonedDateTimeMedium(strava.expiresAt, tz) : "unknown"}
                 </div>
               ) : null}
             </div>
@@ -255,9 +258,9 @@ export default async function SettingsPage({
           {isConnected ? (
             <div className="space-y-3">
               <div className="text-xs text-stone-500">
-                Last updated: {strava?.updatedAt.toLocaleString()} · Last synced:{" "}
+                Last updated: {strava?.updatedAt ? formatZonedDateTimeMedium(strava.updatedAt, tz) : "—"} · Last synced:{" "}
                 {strava?.lastSyncedAt
-                  ? strava.lastSyncedAt.toLocaleString()
+                  ? formatZonedDateTimeMedium(strava.lastSyncedAt, tz)
                   : "never"}
               </div>
               <div className="rounded-xl border border-amber-900/10 bg-card/55 p-4">
@@ -302,7 +305,7 @@ export default async function SettingsPage({
                   <div className="mt-1 text-xs text-stone-500">
                     Scope: {fitbit?.scope ?? "unknown"} · Expires:{" "}
                     {fitbit?.expiresAt
-                      ? fitbit.expiresAt.toLocaleString()
+                      ? formatZonedDateTimeMedium(fitbit.expiresAt, tz)
                       : "unknown"}
                   </div>
                 ) : null}
@@ -326,10 +329,10 @@ export default async function SettingsPage({
             {fitbitConnected ? (
               <div className="mt-4 space-y-3">
                 <div className="text-xs text-stone-500">
-                  Last updated: {fitbit?.updatedAt.toLocaleString()} · Last
+                  Last updated: {fitbit?.updatedAt ? formatZonedDateTimeMedium(fitbit.updatedAt, tz) : "—"} · Last
                   synced:{" "}
                   {fitbit?.lastSyncedAt
-                    ? fitbit.lastSyncedAt.toLocaleString()
+                    ? formatZonedDateTimeMedium(fitbit.lastSyncedAt, tz)
                     : "never"}
                   . Each sync also pulls{" "}
                   <span className="font-medium text-stone-700">
@@ -350,7 +353,7 @@ export default async function SettingsPage({
                           className="flex flex-wrap items-center justify-between gap-2"
                         >
                           <span className="text-stone-600">
-                            {row.date.toLocaleDateString()}
+                            {formatZonedDateShort(row.date, tz)}
                           </span>
                           <span className="text-xs text-stone-500">
                             sleep {minutesToHhMm(row.sleepMinutes)}
@@ -382,7 +385,7 @@ export default async function SettingsPage({
                   <div className="mt-1 text-xs text-stone-500">
                     Scope: {whoop?.scope ?? "unknown"} · Expires:{" "}
                     {whoop?.expiresAt
-                      ? whoop.expiresAt.toLocaleString()
+                      ? formatZonedDateTimeMedium(whoop.expiresAt, tz)
                       : "unknown"}
                   </div>
                 ) : null}
@@ -406,9 +409,9 @@ export default async function SettingsPage({
             {whoopConnected ? (
               <div className="mt-4 space-y-3">
                 <div className="text-xs text-stone-500">
-                  Last updated: {whoop?.updatedAt.toLocaleString()} · Last synced:{" "}
+                  Last updated: {whoop?.updatedAt ? formatZonedDateTimeMedium(whoop.updatedAt, tz) : "—"} · Last synced:{" "}
                   {whoop?.lastSyncedAt
-                    ? whoop.lastSyncedAt.toLocaleString()
+                    ? formatZonedDateTimeMedium(whoop.lastSyncedAt, tz)
                     : "never"}
                   . Sync stores daily recovery, strain, sleep, RHR, body weight, and
                   workout activities (when read:workout is granted) from WHOOP.
@@ -425,7 +428,7 @@ export default async function SettingsPage({
                           className="flex flex-wrap items-center justify-between gap-2"
                         >
                           <span className="text-stone-600">
-                            {row.date.toLocaleDateString()}
+                            {formatZonedDateShort(row.date, tz)}
                           </span>
                           <span className="text-xs text-stone-500">
                             {row.recoveryScore != null

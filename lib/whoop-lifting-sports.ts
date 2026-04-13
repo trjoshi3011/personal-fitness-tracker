@@ -4,6 +4,7 @@
  */
 export const WHOOP_LIFTING_SPORT_NAMES = [
   "weightlifting",
+  "weightlifting_msk",
   "powerlifting",
   "strength trainer",
   "functional fitness",

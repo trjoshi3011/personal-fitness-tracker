@@ -1,5 +1,6 @@
 import type { LiftSessionTemplate } from "@prisma/client";
 
+import { formatZonedDateShort } from "@/lib/format-zoned";
 import {
   localCalendarParts,
   startOfZonedCalendarDay,
@@ -60,11 +61,7 @@ export function lastNZonedWeekStarts(n: number, ref: Date, tz: string): Date[] {
 export function weekShortLabel(monday: Date, tz: string): string {
   const p = localCalendarParts(monday, tz);
   const d = startOfZonedCalendarDay(p.y, p.m, p.d, tz);
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: tz,
-  });
+  return formatZonedDateShort(d, tz);
 }
 
 export type TemplateCounts = Record<LiftSessionTemplate, number>;

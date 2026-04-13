@@ -27,11 +27,9 @@ import {
   zonedMonthRangeUtc,
 } from "@/lib/zoned-calendar";
 import { secondsToHhMm } from "@/lib/units";
+import { formatZonedDateShort, formatZonedDateTimeLiftingCell } from "@/lib/format-zoned";
+import { normalizeUserTimezone } from "@/lib/user-timezone";
 export const dynamic = "force-dynamic";
-
-function shortDay(d: Date) {
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 function formatSportLabel(s: string) {
   return s
@@ -66,7 +64,8 @@ export default async function LiftingPage({
     where: { id: userId },
     select: { timezone: true },
   });
-  const tz = user?.timezone?.trim() || "UTC";
+  const tz = normalizeUserTimezone(user?.timezone);
+  const shortDay = (d: Date) => formatZonedDateShort(d, tz);
   const cal = parseCalendarYearMonth(sp, tz);
   const monthRange = zonedMonthRangeUtc(cal.year, cal.month1, tz);
 
@@ -417,13 +416,7 @@ export default async function LiftingPage({
                         className="border-t border-amber-900/[0.06] transition-colors hover:bg-amber-50/30"
                       >
                         <td className="whitespace-nowrap px-3 py-2.5 text-stone-500">
-                          {w.startAt.toLocaleString("en-US", {
-                            month: "short",
-                            day: "2-digit",
-                            year: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
+                          {formatZonedDateTimeLiftingCell(w.startAt, tz)}
                         </td>
                         <td className="px-3 py-2.5 align-middle">
                           <WhoopLiftTypeSelect

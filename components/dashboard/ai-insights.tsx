@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { Sparkles, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { useUserTimezone } from "@/components/providers/user-timezone-provider";
+import { formatZonedDateTimeMedium } from "@/lib/format-zoned";
 import { cn } from "@/lib/utils";
 
 type InsightSection = {
@@ -64,6 +66,7 @@ function InsightCard({ section }: { section: InsightSection }) {
 }
 
 export function AiInsights() {
+  const timeZone = useUserTimezone();
   const [result, setResult] = React.useState<AiInsightsResult | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -194,12 +197,7 @@ export function AiInsights() {
             {result.generatedAt && (
               <p className="text-[11px] text-stone-400">
                 Generated{" "}
-                {new Date(result.generatedAt).toLocaleString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
+                {formatZonedDateTimeMedium(new Date(result.generatedAt), timeZone)}
               </p>
             )}
           </div>

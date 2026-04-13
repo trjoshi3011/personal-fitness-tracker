@@ -14,6 +14,12 @@ import {
   metersToMiles,
   paceSecondsPerMile,
 } from "@/lib/units";
+import {
+  formatZonedDateShort,
+  formatZonedWeekdayMonthDayYear,
+} from "@/lib/format-zoned";
+import { normalizeUserTimezone } from "@/lib/user-timezone";
+import { startOfZonedWeekMondayContaining } from "@/lib/zoned-calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -21,12 +27,14 @@ function isoDay(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-function shortDate(d: Date) {
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
 export default async function InsightsPage() {
   const userId = await requireUserId();
+  const userTz = await prisma().user.findUnique({
+    where: { id: userId },
+    select: { timezone: true },
+  });
+  const tz = normalizeUserTimezone(userTz?.timezone);
+  const shortDate = (d: Date) => formatZonedDateShort(d, tz);
   const now = new Date();
   const { startMs, endMs, daysInWindow } = utcCalendarWindowBoundsMs(30, now);
   const rangeStart = new Date(startMs);
@@ -85,14 +93,13 @@ export default async function InsightsPage() {
       bestDayKey = k;
     }
   }
-  const bestDayLabel =
+  const bestRun =
     bestDayKey != null && bestMeters > 0
-      ? new Date(`${bestDayKey}T12:00:00.000Z`).toLocaleDateString("en-US", {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
+      ? runsInWindow.find((r) => isoDay(r.startAt) === bestDayKey)
+      : undefined;
+  const bestDayLabel =
+    bestRun != null && bestMeters > 0
+      ? formatZonedWeekdayMonthDayYear(bestRun.startAt, tz)
       : "—";
 
   const weightSeries = whoop30.filter((r) => r.weightKg != null && r.weightKg > 0);
@@ -149,19 +156,17 @@ export default async function InsightsPage() {
     });
   }
 
-  const weekBuckets = new Map<string, { mi: number; runs: number }>();
+  const weekBuckets = new Map<number, { mi: number; runs: number }>();
   for (const run of runsInWindow) {
-    const d = new Date(run.startAt);
-    const weekStart = new Date(d);
-    weekStart.setDate(d.getDate() - d.getDay());
-    const key = shortDate(weekStart);
-    const cur = weekBuckets.get(key) ?? { mi: 0, runs: 0 };
+    const mon = startOfZonedWeekMondayContaining(run.startAt, tz);
+    const k = mon.getTime();
+    const cur = weekBuckets.get(k) ?? { mi: 0, runs: 0 };
     cur.mi += metersToMiles(run.distanceMeters ?? 0);
     cur.runs += 1;
-    weekBuckets.set(key, cur);
+    weekBuckets.set(k, cur);
   }
   const weeklyData = [...weekBuckets.entries()].map(([wk, v]) => ({
-    week: wk,
+    week: shortDate(new Date(wk)),
     mi: Number(v.mi.toFixed(1)),
     runs: v.runs,
   }));

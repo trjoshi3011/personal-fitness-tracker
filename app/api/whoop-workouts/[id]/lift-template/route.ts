@@ -40,7 +40,10 @@ export async function PATCH(
       where: {
         id,
         userId,
-        sportName: { in: [...WHOOP_LIFTING_SPORT_NAMES] },
+        OR: [
+          { sportName: { in: [...WHOOP_LIFTING_SPORT_NAMES] } },
+          { sportName: { startsWith: "weightlifting", mode: "insensitive" } },
+        ],
       },
       select: { id: true },
     });

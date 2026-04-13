@@ -21,19 +21,16 @@ import {
   paceSecondsPerMile,
   secondsToHhMm,
 } from "@/lib/units";
+import {
+  formatZonedDateShort,
+  formatZonedWeekdayShortMonthDay,
+} from "@/lib/format-zoned";
+import { normalizeUserTimezone } from "@/lib/user-timezone";
 
 export const dynamic = "force-dynamic";
 
-function dayLabel(d: Date) {
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-}
-
 function isoDay(d: Date) {
   return d.toISOString().slice(0, 10);
-}
-
-function shortDay(d: Date) {
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function getGreeting(hour: number) {
@@ -89,6 +86,10 @@ export default async function OverviewPage({
       orderBy: { date: "asc" },
     }),
   ]);
+
+  const tz = normalizeUserTimezone(user?.timezone);
+  const dayLabel = (d: Date) => formatZonedWeekdayShortMonthDay(d, tz);
+  const shortDay = (d: Date) => formatZonedDateShort(d, tz);
 
   const totalMeters = activities7.reduce((a, r) => a + (r.distanceMeters ?? 0), 0);
   const totalSeconds = activities7.reduce((a, r) => a + (r.movingTimeSec ?? 0), 0);
@@ -154,7 +155,7 @@ export default async function OverviewPage({
   const sleepData = [...sleepByDay30Chart.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, v]) => ({
-      day: v.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      day: formatZonedDateShort(v.date, tz),
       hours: Number((v.minutes / 60).toFixed(1)),
     }));
 
@@ -170,7 +171,7 @@ export default async function OverviewPage({
   const rhrData = [...rhrByDay30.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, v]) => ({
-      day: v.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      day: formatZonedDateShort(v.date, tz),
       bpm: v.bpm,
     }));
 
@@ -189,7 +190,6 @@ export default async function OverviewPage({
       hrv: Math.round(r.hrvRmssdMs ?? 0),
     }));
 
-  const tz = user?.timezone?.trim() || "UTC";
   const cal = parseCalendarYearMonth(sp, tz);
   const monthRange = zonedMonthRangeUtc(cal.year, cal.month1, tz);
 
@@ -199,7 +199,10 @@ export default async function OverviewPage({
       where: {
         userId,
         startAt: { gte: monthRange.start, lt: monthRange.end },
-        sportName: { in: [...WHOOP_LIFTING_SPORT_NAMES] },
+        OR: [
+          { sportName: { in: [...WHOOP_LIFTING_SPORT_NAMES] } },
+          { sportName: { startsWith: "weightlifting", mode: "insensitive" } },
+        ],
       },
       select: { startAt: true },
       orderBy: { startAt: "asc" },

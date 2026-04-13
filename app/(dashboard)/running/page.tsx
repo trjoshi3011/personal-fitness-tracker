@@ -28,12 +28,10 @@ import {
   secondsToHhMm,
   secondsToHhMmSs,
 } from "@/lib/units";
+import { formatZonedDateShort, formatZonedDateShortWithYear } from "@/lib/format-zoned";
+import { normalizeUserTimezone } from "@/lib/user-timezone";
 
 export const dynamic = "force-dynamic";
-
-function shortDay(d: Date) {
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 function toDateInputValue(d: Date, timeZone: string) {
   const p = localCalendarParts(d, timeZone);
@@ -58,7 +56,8 @@ export default async function RunningPage({
     where: { id: userId },
     select: { timezone: true, runningShoeStartDate: true },
   });
-  const tz = user?.timezone?.trim() || "UTC";
+  const tz = normalizeUserTimezone(user?.timezone);
+  const shortDay = (d: Date) => formatZonedDateShort(d, tz);
   const cal = parseCalendarYearMonth(sp, tz);
   const monthRange = zonedMonthRangeUtc(cal.year, cal.month1, tz);
 
@@ -140,7 +139,7 @@ export default async function RunningPage({
         meters: r.distanceMeters ?? 0,
       });
       return {
-        date: r.startAt.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        date: formatZonedDateShort(r.startAt, tz),
         pace: spm != null ? Number((spm / 60).toFixed(2)) : null,
       };
     })
@@ -150,7 +149,7 @@ export default async function RunningPage({
   const distPerRun = [...recentRuns]
     .reverse()
     .map((r) => ({
-      date: r.startAt.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      date: formatZonedDateShort(r.startAt, tz),
       mi: Number(metersToMiles(r.distanceMeters ?? 0).toFixed(2)),
     }));
 
@@ -159,7 +158,7 @@ export default async function RunningPage({
     .reverse()
     .filter((r) => r.averageHrBpm != null)
     .map((r) => ({
-      date: r.startAt.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      date: formatZonedDateShort(r.startAt, tz),
       avg: r.averageHrBpm,
       max: r.maxHrBpm,
     }));
@@ -359,7 +358,7 @@ export default async function RunningPage({
                     return (
                       <tr key={r.rowKey} className="border-t border-amber-900/[0.06] transition-colors hover:bg-amber-50/30">
                         <td className="whitespace-nowrap px-3 py-2.5 text-stone-500">
-                          {r.startAt.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })}
+                          {formatZonedDateShortWithYear(r.startAt, tz)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2.5 text-stone-600">
                           <span className="rounded-md bg-amber-100/80 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-stone-700 uppercase">
