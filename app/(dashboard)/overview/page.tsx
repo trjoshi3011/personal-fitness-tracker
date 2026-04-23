@@ -33,6 +33,16 @@ function isoDay(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
+function zonedDayKey(d: Date, timeZone: string) {
+  // YYYY-MM-DD in the user's timezone (prevents UTC day shifting).
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
 function getGreeting(hour: number) {
   if (hour < 12) return "Good Morning";
   if (hour < 18) return "Good Afternoon";
@@ -131,10 +141,10 @@ export default async function OverviewPage({
   const distByDay = new Map<string, { label: string; mi: number }>();
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-    distByDay.set(isoDay(d), { label: dayLabel(d), mi: 0 });
+    distByDay.set(zonedDayKey(d, tz), { label: dayLabel(d), mi: 0 });
   }
   for (const a of activities7) {
-    const key = isoDay(a.startAt);
+    const key = zonedDayKey(a.startAt, tz);
     const entry = distByDay.get(key);
     if (entry) entry.mi += metersToMiles(a.distanceMeters ?? 0);
   }
