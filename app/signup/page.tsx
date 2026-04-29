@@ -18,7 +18,7 @@ export default function SignupPage({
       <div className="mx-auto flex w-full max-w-md flex-col gap-6">
         <div className="text-center">
           <p className="text-sm tracking-widest text-stone-500 uppercase">
-            Personal fitness tracker
+            LockIn.
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">
             Create account

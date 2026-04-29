@@ -33,8 +33,7 @@ export function Sidebar() {
     <aside className="hidden md:flex md:w-64 md:flex-col md:bg-transparent">
       <div className="flex h-16 items-center px-6">
         <Link href="/overview" className="text-lg font-semibold tracking-tight text-stone-900">
-          Fitness
-          <span className="text-stone-500">Dashboard</span>
+          LockIn<span className="text-stone-500">.</span>
         </Link>
       </div>
       <nav className="flex flex-1 flex-col gap-1 px-3 pb-4 pt-2">

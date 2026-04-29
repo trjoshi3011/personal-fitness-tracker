@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
 import { normalizeUserTimezone } from "@/lib/user-timezone";
 
 export const metadata: Metadata = {
-  title: "Fitness Dashboard",
+  title: "LockIn.",
 };
 
 export default async function DashboardLayout({

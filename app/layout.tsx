@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fitness Dashboard",
-  description: "Personal fitness tracking dashboard",
+  title: "LockIn.",
+  description: "Training, recovery, and progress dashboard",
 };
 
 const themeScript = `try{const t=localStorage.getItem('${THEME_STORAGE_KEY}');if(t==='olive'||t==='lavender'||t==='terracotta'){document.documentElement.setAttribute('data-theme',t)}else{document.documentElement.setAttribute('data-theme','olive')}}catch{document.documentElement.setAttribute('data-theme','olive')}`;
