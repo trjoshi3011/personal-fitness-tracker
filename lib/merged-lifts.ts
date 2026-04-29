@@ -1,3 +1,5 @@
+import type { LiftSessionTemplate } from "@prisma/client";
+
 import { prisma } from "@/lib/db";
 import type { WhoopLiftingRow } from "@/lib/whoop-lifting-queries";
 import { fetchWhoopLiftingWorkoutsInRange } from "@/lib/whoop-lifting-queries";
@@ -18,18 +20,14 @@ export type MergedLiftRow =
       kilojoule: null;
       percentRecorded: null;
       zoneDurations: null;
-      liftSessionTemplate: null;
+      liftSessionTemplate: LiftSessionTemplate | null;
     };
 
-const STRAVA_LIFT_TYPES = new Set([
+export const STRAVA_LIFT_TYPES = new Set<string>([
   "WeightTraining",
-  "Workout",
-  "Crossfit",
-  "HIIT",
-  "StrengthTraining",
 ]);
 
-function isStravaLift(a: { type: string | null; sportType: string | null }) {
+export function isStravaLift(a: { type: string | null; sportType: string | null }) {
   const t = a.type?.trim() ?? "";
   const s = a.sportType?.trim() ?? "";
   return STRAVA_LIFT_TYPES.has(t) || STRAVA_LIFT_TYPES.has(s);
@@ -78,6 +76,7 @@ export async function fetchMergedLiftsInRange(
         movingTimeSec: true,
         averageHrBpm: true,
         maxHrBpm: true,
+        liftSessionTemplate: true,
       },
       orderBy: { startAt: "desc" },
     }),
@@ -104,7 +103,7 @@ export async function fetchMergedLiftsInRange(
         kilojoule: null,
         percentRecorded: null,
         zoneDurations: null,
-        liftSessionTemplate: null,
+        liftSessionTemplate: a.liftSessionTemplate,
       };
     });
 

@@ -226,8 +226,7 @@ export default async function RecoveryPage() {
         <p className="text-sm tracking-widest text-stone-500 uppercase">Health</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Recovery</h1>
         <p className="mt-2 text-base leading-relaxed text-stone-600">
-          WHOOP recovery, strain, HRV, and body weight (from WHOOP body measurement API when synced). Sleep averages use
-          a 30-day window merging WHOOP with historical Fitbit. Step counts are not available from WHOOP.
+          Recovery, sleep, HRV, and weight trends.
         </p>
       </div>
 

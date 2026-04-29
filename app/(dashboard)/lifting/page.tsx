@@ -4,7 +4,7 @@ import { ActivityMonthCalendar } from "@/components/dashboard/activity-month-cal
 import type { LiftDayBucket } from "@/components/dashboard/lifting-type-month-calendar";
 import { LiftingTypeMonthCalendar } from "@/components/dashboard/lifting-type-month-calendar";
 import { LiftWeeklyPlanClient } from "@/components/dashboard/lift-weekly-plan-client";
-import { WhoopLiftTypeSelect } from "@/components/dashboard/whoop-lift-type-select";
+import { LiftTypeSelect } from "@/components/dashboard/lift-type-select";
 import { BarChartView } from "@/components/charts/bar-chart";
 import { MultiLineChartView } from "@/components/charts/multi-line-chart";
 import { prisma } from "@/lib/db";
@@ -104,7 +104,6 @@ export default async function LiftingPage({
   const thisMondayMs = thisMonday.getTime();
   const thisWeekCounts = emptyTemplateCounts();
   for (const w of lift30) {
-    if (w.source !== "WHOOP") continue;
     if (w.liftSessionTemplate == null) continue;
     if (startOfZonedWeekMondayContaining(w.startAt, tz).getTime() !== thisMondayMs) {
       continue;
@@ -135,7 +134,7 @@ export default async function LiftingPage({
     if (p.y !== cal.year || p.m !== cal.month1) continue;
     const dom = p.d;
     const cur = liftTypeDayMap.get(dom) ?? { templates: [], untaggedLiftCount: 0 };
-    if (w.source === "WHOOP" && w.liftSessionTemplate) cur.templates.push(w.liftSessionTemplate);
+    if (w.liftSessionTemplate) cur.templates.push(w.liftSessionTemplate);
     else cur.untaggedLiftCount += 1;
     liftTypeDayMap.set(dom, cur);
   }
@@ -227,13 +226,7 @@ export default async function LiftingPage({
         <p className="text-sm tracking-widest text-stone-500 uppercase">Training</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Lifting</h1>
         <p className="mt-2 text-base leading-relaxed text-stone-600">
-          Strength sessions from WHOOP workouts (
-          {WHOOP_LIFTING_SPORT_NAMES.join(", ")}). WHOOP reports workout strain, heart rate,
-          energy (kJ), and time in HR zones — not individual lifts or sets. Run a WHOOP sync in
-          Settings to pull workout data from the WHOOP developer workout API.           Assign each WHOOP lift a{" "}
-          <span className="font-medium text-stone-800">session type</span> (push, pull, or legs) in
-          the table below — it tags that workout only. The month calendar shows which day was which
-          split; weekly plan consistency uses those tags.
+          Lifting sessions (WHOOP + Strava) with push/pull/legs tagging.
         </p>
       </div>
 
@@ -376,7 +369,7 @@ export default async function LiftingPage({
 
       <ChartCard
         title="Weekly split plan"
-        description="Targets per week; actuals come from session types you set on each WHOOP row"
+        description="Targets per week; actuals come from session types you set on each lift (WHOOP or Strava)"
         contentClassName="pt-0"
       >
         <LiftWeeklyPlanClient initialTargets={initialTargets} />
@@ -385,7 +378,7 @@ export default async function LiftingPage({
       <section>
         <ChartCard
           title="Recent strength workouts"
-          description="Last 40 lifting sessions in the last 30 days (WHOOP + Strava), newest first — session type tagging is WHOOP-only"
+          description="Last 40 lifting sessions in the last 30 days (WHOOP + Strava), newest first — set push/pull/legs per row"
           contentClassName="pt-0"
         >
           <div className="overflow-x-auto">
@@ -420,14 +413,14 @@ export default async function LiftingPage({
                           {formatZonedDateTimeLiftingCell(w.startAt, tz)}
                         </td>
                         <td className="px-3 py-2.5 align-middle">
-                          {isWhoop ? (
-                            <WhoopLiftTypeSelect
-                              workoutId={w.id}
-                              initial={w.liftSessionTemplate}
-                            />
-                          ) : (
-                            <span className="text-xs text-[color:var(--color-text-tertiary)]">—</span>
-                          )}
+                          <LiftTypeSelect
+                            initial={w.liftSessionTemplate}
+                            endpoint={
+                              isWhoop
+                                ? `/api/whoop-workouts/${w.id}/lift-template`
+                                : `/api/strava-activities/${w.id}/lift-template`
+                            }
+                          />
                         </td>
                         <td className="px-3 py-2.5">
                           <span

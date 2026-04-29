@@ -213,8 +213,7 @@ export default async function InsightsPage() {
         <p className="text-sm tracking-widest text-stone-500 uppercase">Analytics</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Insights</h1>
         <p className="mt-2 text-base leading-relaxed text-stone-600">
-          Strava runs and WHOOP metrics over the last 30 UTC calendar days. Sleep merges WHOOP with historical Fitbit;
-          weight comes from WHOOP body measurements after sync.
+          30-day analytics across runs, recovery, sleep, and weight.
         </p>
       </div>
 

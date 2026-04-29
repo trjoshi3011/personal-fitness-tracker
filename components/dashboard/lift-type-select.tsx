@@ -10,29 +10,28 @@ import { LIFT_TEMPLATE_LABELS } from "@/lib/lift-session-log";
 
 const OPTIONS: LiftSessionTemplate[] = ["PUSH", "PULL", "LEGS"];
 
-export function WhoopLiftTypeSelect({
-  workoutId,
-  initial,
-  className,
-}: {
-  workoutId: string;
+type LiftTypeSelectProps = {
   initial: LiftSessionTemplate | null;
+  /** Endpoint should accept PATCH { template: "PUSH" | "PULL" | "LEGS" | null }. */
+  endpoint: string;
   className?: string;
-}) {
+};
+
+export function LiftTypeSelect({ initial, endpoint, className }: LiftTypeSelectProps) {
   const router = useRouter();
   const [value, setValue] = React.useState<string>(initial ?? "");
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
     setValue(initial ?? "");
-  }, [initial, workoutId]);
+  }, [initial, endpoint]);
 
   async function commit(next: string) {
     const prev = value;
     setValue(next);
     setBusy(true);
     try {
-      const res = await fetch(`/api/whoop-workouts/${workoutId}/lift-template`, {
+      const res = await fetch(endpoint, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

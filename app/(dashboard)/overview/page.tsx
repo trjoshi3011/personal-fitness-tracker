@@ -229,8 +229,7 @@ export default async function OverviewPage({
           {greeting}, {firstName}
         </h1>
         <p className="mt-2 text-base leading-relaxed text-stone-600">
-          Running from Strava; recovery, strain, and HRV from WHOOP; sleep (30-day average) merges WHOOP with historical
-          Fitbit where available.
+          Your weekly snapshot across running, recovery, and sleep.
         </p>
       </div>
 

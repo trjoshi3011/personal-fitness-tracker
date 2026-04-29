@@ -265,8 +265,7 @@ export default async function JourneyPage() {
         <p className="text-sm tracking-widest text-stone-500 uppercase">Long-term</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Journey</h1>
         <p className="mt-2 max-w-2xl text-base leading-relaxed text-stone-600">
-          Long-term trends: running from Strava (monthly); WHOOP recovery, strain, HRV, and weight (weekly averages);
-          sleep charts merge WHOOP with historical Fitbit per night then average by month. Data refreshes after each sync.
+          Long-term trends and progress over time.
         </p>
       </div>
 

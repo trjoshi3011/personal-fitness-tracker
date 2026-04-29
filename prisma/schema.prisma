@@ -317,6 +317,10 @@ model StravaActivity {
   calories              Int?
   weightedAverageWatts  Int?
 
+  /// User-assigned lift session type for strength activities pulled from Strava.
+  /// Same enum as WHOOP so lifting analytics can merge tags across sources.
+  liftSessionTemplate LiftSessionTemplate?
+
   // Optional polylines / streams can be stored later; keep raw for now
   rawPayload Json?
 

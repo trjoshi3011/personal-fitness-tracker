@@ -78,9 +78,7 @@ export default async function TrainingPage({
         <p className="text-sm tracking-widest text-stone-500 uppercase">Training</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">AI plan</h1>
         <p className="mt-2 text-base leading-relaxed text-stone-600">
-          Gemini builds a two-week, running-only block from your last three weeks of Strava runs plus
-          any notes you add in the floating panel. Plans are saved per block start (Monday) so you can
-          revisit or regenerate.
+            Generate and review a two-week running plan.
         </p>
       </div>
 

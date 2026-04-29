@@ -193,7 +193,7 @@ export default async function RunningPage({
         <p className="text-sm tracking-widest text-stone-500 uppercase">Training</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Running</h1>
         <p className="mt-2 text-base leading-relaxed text-stone-600">
-          Runs from Strava (with historical Fitbit logs). WHOOP recovery and strain show how your body handles the training load.
+          Strava runs, trends, and recent history.
         </p>
       </div>
 

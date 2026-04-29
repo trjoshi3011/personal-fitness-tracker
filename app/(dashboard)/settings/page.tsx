@@ -118,7 +118,7 @@ export default async function SettingsPage({
         <p className="text-sm tracking-widest text-stone-500 uppercase">Configuration</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Settings</h1>
         <p className="mt-2 text-base leading-relaxed text-stone-600">
-          Configure integrations, units, goals, and data preferences.
+          Manage integrations and account settings.
         </p>
       </div>
 
