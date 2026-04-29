@@ -61,7 +61,7 @@ export function LiftWeeklyPlanClient({
   return (
     <div className="space-y-3 px-6 pb-6">
       {error ? (
-        <div className="rounded-xl border border-rose-900/15 bg-rose-50/50 px-3 py-2 text-sm text-rose-800">
+        <div className="rounded-xl border border-[color:color-mix(in_srgb,var(--ui-danger)_35%,transparent)] bg-[color:var(--ui-danger-soft)] px-3 py-2 text-sm text-[color:color-mix(in_srgb,var(--ui-danger)_72%,var(--color-text-primary))]">
           {error}
         </div>
       ) : null}
@@ -78,7 +78,7 @@ export function LiftWeeklyPlanClient({
             max={14}
             value={tPush}
             onChange={(e) => setTPush(e.target.value)}
-            className="h-9 w-16 rounded-lg border border-amber-950/15 bg-card px-2 text-sm text-stone-900"
+            className="h-9 w-16 rounded-lg border border-[color:var(--color-border-default)] bg-card px-2 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:var(--ui-accent)] focus:ring-2 focus:ring-[color:var(--ring)]"
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-stone-500">
@@ -89,7 +89,7 @@ export function LiftWeeklyPlanClient({
             max={14}
             value={tPull}
             onChange={(e) => setTPull(e.target.value)}
-            className="h-9 w-16 rounded-lg border border-amber-950/15 bg-card px-2 text-sm text-stone-900"
+            className="h-9 w-16 rounded-lg border border-[color:var(--color-border-default)] bg-card px-2 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:var(--ui-accent)] focus:ring-2 focus:ring-[color:var(--ring)]"
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-stone-500">
@@ -100,13 +100,13 @@ export function LiftWeeklyPlanClient({
             max={14}
             value={tLegs}
             onChange={(e) => setTLegs(e.target.value)}
-            className="h-9 w-16 rounded-lg border border-amber-950/15 bg-card px-2 text-sm text-stone-900"
+            className="h-9 w-16 rounded-lg border border-[color:var(--color-border-default)] bg-card px-2 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:var(--ui-accent)] focus:ring-2 focus:ring-[color:var(--ring)]"
           />
         </label>
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-stone-900 px-3 text-xs font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[color:var(--ui-accent)] px-3 text-xs font-medium text-[color:var(--color-text-inverse)] hover:bg-[color:color-mix(in_srgb,var(--ui-accent)_88%,black)] disabled:opacity-50"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
           Save plan

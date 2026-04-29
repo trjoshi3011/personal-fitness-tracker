@@ -48,13 +48,13 @@ export function CombinedMonthCalendar({
         <div className="flex items-center gap-1.5">
           <Link
             href={`${basePath}${qs(prev.year, prev.month1)}`}
-            className="rounded-md border border-amber-900/12 bg-card px-2 py-1 text-xs text-stone-600 transition-colors hover:bg-amber-50/50"
+            className="rounded-md border border-[color:var(--color-border-default)] bg-card px-2 py-1 text-xs text-[color:var(--color-text-secondary)] transition-colors hover:bg-[color:var(--ui-accent-soft)]"
           >
             &lsaquo;
           </Link>
           <Link
             href={`${basePath}${qs(next.year, next.month1)}`}
-            className="rounded-md border border-amber-900/12 bg-card px-2 py-1 text-xs text-stone-600 transition-colors hover:bg-amber-50/50"
+            className="rounded-md border border-[color:var(--color-border-default)] bg-card px-2 py-1 text-xs text-[color:var(--color-text-secondary)] transition-colors hover:bg-[color:var(--ui-accent-soft)]"
           >
             &rsaquo;
           </Link>
@@ -83,20 +83,21 @@ export function CombinedMonthCalendar({
             let cellText: string;
             let cellRing: string;
             if (both) {
-              cellBg = "bg-gradient-to-br from-amber-500/20 to-rose-400/20";
-              cellText = "text-stone-900 font-semibold";
-              cellRing = "ring-1 ring-amber-500/30";
+              cellBg =
+                "bg-[image:linear-gradient(135deg,color-mix(in_srgb,var(--ui-run)_22%,transparent)_0%,color-mix(in_srgb,var(--ui-lift)_22%,transparent)_100%)]";
+              cellText = "text-[color:var(--color-text-primary)] font-semibold";
+              cellRing = "ring-1 ring-[color:color-mix(in_srgb,var(--ui-accent)_28%,transparent)]";
             } else if (ran) {
-              cellBg = "bg-amber-500/20";
-              cellText = "text-amber-800 font-semibold";
-              cellRing = "ring-1 ring-amber-500/40";
+              cellBg = "bg-[color:color-mix(in_srgb,var(--ui-run)_22%,transparent)]";
+              cellText = "text-[color:var(--color-text-primary)] font-semibold";
+              cellRing = "ring-1 ring-[color:color-mix(in_srgb,var(--ui-run)_42%,transparent)]";
             } else if (lifted) {
-              cellBg = "bg-rose-400/15";
-              cellText = "text-rose-800 font-semibold";
-              cellRing = "ring-1 ring-rose-400/35";
+              cellBg = "bg-[color:color-mix(in_srgb,var(--ui-lift)_22%,transparent)]";
+              cellText = "text-[color:var(--color-text-primary)] font-semibold";
+              cellRing = "ring-1 ring-[color:color-mix(in_srgb,var(--ui-lift)_42%,transparent)]";
             } else {
               cellBg = "";
-              cellText = "text-stone-500";
+              cellText = "text-[color:var(--color-text-tertiary)]";
               cellRing = "";
             }
 
@@ -108,14 +109,14 @@ export function CombinedMonthCalendar({
                   cellBg,
                   cellText,
                   cellRing,
-                  !ran && !lifted && "hover:bg-stone-100/50",
+                  !ran && !lifted && "hover:bg-[color:var(--ui-accent-soft)]",
                 )}
               >
                 {day}
                 {(ran || lifted) && (
                   <span className="absolute bottom-0 left-1/2 flex -translate-x-1/2 gap-px">
-                    {ran && <span className="h-[3px] w-[3px] rounded-full bg-amber-500" />}
-                    {lifted && <span className="h-[3px] w-[3px] rounded-full bg-rose-400" />}
+                    {ran && <span className="h-[3px] w-[3px] rounded-full bg-[color:var(--ui-run)]" />}
+                    {lifted && <span className="h-[3px] w-[3px] rounded-full bg-[color:var(--ui-lift)]" />}
                   </span>
                 )}
               </div>
@@ -125,13 +126,13 @@ export function CombinedMonthCalendar({
 
         <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-stone-400">
           <span className="flex items-center gap-1">
-            <Footprints className="h-2.5 w-2.5 text-amber-600" />
-            <span className="inline-block h-2 w-2 rounded-sm bg-amber-500/20 ring-1 ring-amber-500/40" />
+            <Footprints className="h-2.5 w-2.5 text-[color:var(--ui-run)]" />
+            <span className="inline-block h-2 w-2 rounded-sm bg-[color:color-mix(in_srgb,var(--ui-run)_22%,transparent)] ring-1 ring-[color:color-mix(in_srgb,var(--ui-run)_42%,transparent)]" />
             {runDays.size} run{runDays.size !== 1 ? "s" : ""}
           </span>
           <span className="flex items-center gap-1">
-            <Dumbbell className="h-2.5 w-2.5 text-rose-500" />
-            <span className="inline-block h-2 w-2 rounded-sm bg-rose-400/15 ring-1 ring-rose-400/35" />
+            <Dumbbell className="h-2.5 w-2.5 text-[color:var(--ui-lift)]" />
+            <span className="inline-block h-2 w-2 rounded-sm bg-[color:color-mix(in_srgb,var(--ui-lift)_22%,transparent)] ring-1 ring-[color:color-mix(in_srgb,var(--ui-lift)_42%,transparent)]" />
             {liftDays.size} lift{liftDays.size !== 1 ? "s" : ""}
           </span>
           <span className="ml-auto">{daysInMonth} days</span>

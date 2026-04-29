@@ -60,7 +60,7 @@ export function WhoopLiftTypeSelect({
         disabled={busy}
         onChange={(e) => void commit(e.target.value)}
         className={cn(
-          "max-w-[140px] rounded-lg border border-amber-950/15 bg-card py-1.5 pl-2 pr-7 text-xs text-stone-900",
+          "max-w-[140px] rounded-lg border border-[color:var(--color-border-default)] bg-card py-1.5 pl-2 pr-7 text-xs text-[color:var(--color-text-primary)] outline-none focus:border-[color:var(--ui-accent)] focus:ring-2 focus:ring-[color:var(--ring)]",
           busy && "opacity-60",
         )}
         aria-label="Lift session type"

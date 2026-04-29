@@ -260,11 +260,11 @@ export function TrainingContextPanel() {
           });
           setCollapsed(false);
         }}
-        className="fixed right-5 bottom-20 z-40 inline-flex items-center gap-2 rounded-full border border-amber-900/20 bg-card px-4 py-2 text-sm font-medium text-stone-800 shadow-md transition-colors hover:bg-amber-50"
+        className="fixed right-5 bottom-20 z-40 inline-flex items-center gap-2 rounded-full border border-[color:var(--color-border-default)] bg-card px-4 py-2 text-sm font-medium text-[color:var(--color-text-primary)] shadow-md transition-colors hover:bg-[color:var(--ui-accent-soft)]"
       >
-        <ClipboardList className="h-4 w-4 text-orange-600" />
+        <ClipboardList className="h-4 w-4 text-[color:var(--ui-accent)]" />
         Plan context
-        <ChevronUp className="h-4 w-4 text-stone-500" />
+        <ChevronUp className="h-4 w-4 text-[color:var(--color-text-tertiary)]" />
       </button>
     );
   }
@@ -273,20 +273,20 @@ export function TrainingContextPanel() {
     <div
       style={{ left: panel.x, top: panel.y, width: panel.width, height: panel.height }}
       className={cn(
-        "fixed z-40 flex flex-col rounded-2xl border border-amber-900/20 bg-card shadow-lg",
+        "fixed z-40 flex flex-col rounded-2xl border border-[color:var(--color-border-default)] bg-card shadow-lg",
       )}
     >
       <div
         onPointerDown={startMove}
-        className="flex cursor-move items-center justify-between gap-3 border-b border-amber-900/10 px-4 py-3"
+        className="flex cursor-move items-center justify-between gap-3 border-b border-[color:var(--color-border-subtle)] px-4 py-3"
       >
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[image:linear-gradient(135deg,var(--ui-accent)_0%,var(--ui-accent-2)_100%)]">
             <ClipboardList className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-stone-900">Plan notes</h2>
-            <p className="text-[11px] text-stone-500">
+            <h2 className="text-sm font-semibold text-[color:var(--color-text-primary)]">Plan notes</h2>
+            <p className="text-[11px] text-[color:var(--color-text-tertiary)]">
               Injuries, lower mileage, race prep — sent when you generate
             </p>
           </div>
@@ -294,7 +294,7 @@ export function TrainingContextPanel() {
         <button
           type="button"
           onClick={() => setCollapsed(true)}
-          className="inline-flex h-8 items-center gap-1 rounded-lg border border-amber-900/15 bg-background/60 px-2 text-xs font-medium text-stone-600 transition-colors hover:bg-amber-50/60 hover:text-stone-800"
+          className="inline-flex h-8 items-center gap-1 rounded-lg border border-[color:var(--color-border-default)] bg-[color:color-mix(in_srgb,var(--background)_60%,transparent)] px-2 text-xs font-medium text-[color:var(--color-text-secondary)] transition-colors hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)]"
           aria-label="Collapse plan context panel"
         >
           <ChevronDown className="h-3.5 w-3.5" />
@@ -307,11 +307,11 @@ export function TrainingContextPanel() {
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="e.g. sore left IT band — keep easy runs only; cap long run at 8 mi this block."
-          className="min-h-0 flex-1 resize-none rounded-xl border border-amber-950/15 bg-stone-50/80 p-3 text-sm leading-relaxed text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+          className="min-h-0 flex-1 resize-none rounded-xl border border-[color:var(--color-border-default)] bg-[color:color-mix(in_srgb,var(--color-bg-surface)_78%,transparent)] p-3 text-sm leading-relaxed text-[color:var(--color-text-primary)] outline-none focus:border-[color:var(--ui-accent)] focus:ring-2 focus:ring-[color:var(--ring)]"
           maxLength={4000}
           spellCheck
         />
-        <p className="mt-2 text-[10px] text-stone-400">
+        <p className="mt-2 text-[10px] text-[color:var(--color-text-tertiary)]">
           Uses your last 3 weeks of Strava runs plus these notes. Not medical advice.
         </p>
       </div>

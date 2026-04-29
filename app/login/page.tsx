@@ -66,7 +66,7 @@ export default function LoginPage({
                   name="email"
                   type="email"
                   required
-                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
                 />
               </label>
               <label className="block">
@@ -77,22 +77,25 @@ export default function LoginPage({
                   name="password"
                   type="password"
                   required
-                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
                 />
               </label>
-              <button className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800">
+              <button className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-[color:var(--ui-accent)] px-4 text-sm font-medium text-[color:var(--color-text-inverse)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--ui-accent)_88%,#000)]">
                 Log in
               </button>
             </form>
 
             <div className="text-sm text-stone-600">
               New here?{" "}
-              <Link href={`/signup?next=${encodeURIComponent(next)}`} className="font-medium text-orange-700 hover:underline">
+              <Link
+                href={`/signup?next=${encodeURIComponent(next)}`}
+                className="font-medium text-[color:var(--ui-accent)] hover:underline"
+              >
                 Create an account
               </Link>
             </div>
 
-            <details className="rounded-xl border border-amber-900/10 bg-amber-50/30 p-3">
+            <details className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--ui-accent-soft)] p-3">
               <summary className="cursor-pointer text-sm font-medium text-stone-700">
                 Forgot my password
               </summary>
@@ -109,7 +112,7 @@ export default function LoginPage({
                     name="email"
                     type="email"
                     required
-                    className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                    className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
                   />
                 </label>
                 <label className="block">
@@ -121,7 +124,7 @@ export default function LoginPage({
                     type="password"
                     minLength={8}
                     required
-                    className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                    className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
                   />
                 </label>
                 <label className="block">
@@ -133,10 +136,10 @@ export default function LoginPage({
                     type="password"
                     minLength={8}
                     required
-                    className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                    className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
                   />
                 </label>
-                <button className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-900/15 bg-card/70 px-3 text-sm font-medium text-stone-700 transition-all hover:border-orange-500/40 hover:bg-amber-50/70 hover:text-orange-700">
+                <button className="inline-flex h-9 items-center justify-center rounded-xl border border-[color:var(--color-border-default)] bg-card/70 px-3 text-sm font-medium text-[color:var(--color-text-secondary)] transition-all hover:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)]">
                   Reset password
                 </button>
               </form>

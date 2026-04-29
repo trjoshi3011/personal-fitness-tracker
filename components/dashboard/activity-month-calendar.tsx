@@ -11,19 +11,19 @@ const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"] as const;
 const VARIANT = {
   "/running": {
     icon: Footprints,
-    activeBg: "bg-amber-500/20",
-    activeRing: "ring-amber-500/40",
-    activeText: "text-amber-800",
-    iconColor: "text-amber-600",
-    dotColor: "bg-amber-500",
+    activeBg: "bg-[color:color-mix(in_srgb,var(--ui-run)_22%,transparent)]",
+    activeRing: "ring-[color:color-mix(in_srgb,var(--ui-run)_42%,transparent)]",
+    activeText: "text-[color:var(--color-text-primary)]",
+    iconColor: "text-[color:var(--ui-run)]",
+    dotColor: "bg-[color:var(--ui-run)]",
   },
   "/lifting": {
     icon: Dumbbell,
-    activeBg: "bg-rose-400/15",
-    activeRing: "ring-rose-400/35",
-    activeText: "text-rose-800",
-    iconColor: "text-rose-500",
-    dotColor: "bg-rose-400",
+    activeBg: "bg-[color:color-mix(in_srgb,var(--ui-lift)_22%,transparent)]",
+    activeRing: "ring-[color:color-mix(in_srgb,var(--ui-lift)_42%,transparent)]",
+    activeText: "text-[color:var(--color-text-primary)]",
+    iconColor: "text-[color:var(--ui-lift)]",
+    dotColor: "bg-[color:var(--ui-lift)]",
   },
 } as const;
 
@@ -75,13 +75,13 @@ export function ActivityMonthCalendar({
         <div className="flex items-center gap-1.5">
           <Link
             href={`${basePath}${qs(prev.year, prev.month1)}`}
-            className="rounded-md border border-amber-900/12 bg-card px-2 py-1 text-xs text-stone-600 transition-colors hover:bg-amber-50/50"
+            className="rounded-md border border-[color:var(--color-border-default)] bg-card px-2 py-1 text-xs text-[color:var(--color-text-secondary)] transition-colors hover:bg-[color:var(--ui-accent-soft)]"
           >
             &lsaquo;
           </Link>
           <Link
             href={`${basePath}${qs(next.year, next.month1)}`}
-            className="rounded-md border border-amber-900/12 bg-card px-2 py-1 text-xs text-stone-600 transition-colors hover:bg-amber-50/50"
+            className="rounded-md border border-[color:var(--color-border-default)] bg-card px-2 py-1 text-xs text-[color:var(--color-text-secondary)] transition-colors hover:bg-[color:var(--ui-accent-soft)]"
           >
             &rsaquo;
           </Link>
@@ -110,7 +110,7 @@ export function ActivityMonthCalendar({
                   "relative flex h-7 items-center justify-center rounded-md text-xs tabular-nums transition-colors",
                   on
                     ? `${v.activeBg} ${v.activeText} font-semibold ring-1 ${v.activeRing}`
-                    : "text-stone-500 hover:bg-stone-100/50",
+                    : "text-[color:var(--color-text-tertiary)] hover:bg-[color:var(--ui-accent-soft)]",
                 )}
               >
                 {day}
@@ -127,7 +127,7 @@ export function ActivityMonthCalendar({
           })}
         </div>
 
-        <div className="mt-2.5 flex items-center justify-between text-[10px] text-stone-400">
+        <div className="mt-2.5 flex items-center justify-between text-[10px] text-[color:var(--color-text-tertiary)]">
           <span className="flex items-center gap-1">
             <span className={cn("inline-block h-2 w-2 rounded-sm", v.activeBg, "ring-1", v.activeRing)} />
             {activeDays.size} {legendLabel} day{activeDays.size !== 1 ? "s" : ""}

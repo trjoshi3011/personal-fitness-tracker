@@ -17,8 +17,8 @@ import {
   targetsToRecord,
   weekConsistencyScore,
 } from "@/lib/lift-session-log";
-import { fetchWhoopLiftingWorkoutsInRange } from "@/lib/whoop-lifting-queries";
 import { WHOOP_LIFTING_SPORT_NAMES } from "@/lib/whoop-lifting-sports";
+import { fetchMergedLiftsInRange, type MergedLiftRow } from "@/lib/merged-lifts";
 import {
   activeZonedDaysOfMonth,
   localCalendarParts,
@@ -77,9 +77,9 @@ export default async function LiftingPage({
     whoop30,
     liftSplitTargets,
   ] = await Promise.all([
-    fetchWhoopLiftingWorkoutsInRange(userId, start7, now),
-    fetchWhoopLiftingWorkoutsInRange(userId, start30, now),
-    fetchWhoopLiftingWorkoutsInRange(userId, monthRange.start, monthRange.end),
+    fetchMergedLiftsInRange(userId, start7, now),
+    fetchMergedLiftsInRange(userId, start30, now),
+    fetchMergedLiftsInRange(userId, monthRange.start, monthRange.end),
     prisma().dailyWhoopStat.findMany({
       where: { userId, date: { gte: start7 } },
       select: { recoveryScore: true, strain: true, hrvRmssdMs: true },
@@ -104,6 +104,7 @@ export default async function LiftingPage({
   const thisMondayMs = thisMonday.getTime();
   const thisWeekCounts = emptyTemplateCounts();
   for (const w of lift30) {
+    if (w.source !== "WHOOP") continue;
     if (w.liftSessionTemplate == null) continue;
     if (startOfZonedWeekMondayContaining(w.startAt, tz).getTime() !== thisMondayMs) {
       continue;
@@ -134,11 +135,8 @@ export default async function LiftingPage({
     if (p.y !== cal.year || p.m !== cal.month1) continue;
     const dom = p.d;
     const cur = liftTypeDayMap.get(dom) ?? { templates: [], untaggedLiftCount: 0 };
-    if (w.liftSessionTemplate) {
-      cur.templates.push(w.liftSessionTemplate);
-    } else {
-      cur.untaggedLiftCount += 1;
-    }
+    if (w.source === "WHOOP" && w.liftSessionTemplate) cur.templates.push(w.liftSessionTemplate);
+    else cur.untaggedLiftCount += 1;
     liftTypeDayMap.set(dom, cur);
   }
 
@@ -154,7 +152,9 @@ export default async function LiftingPage({
     (acc, w) => acc + (w.endAt.getTime() - w.startAt.getTime()) / 1000,
     0,
   );
-  const scored = lift7.filter((w) => w.scoreState === "SCORED" && w.strain != null);
+  const scored = lift7.filter(
+    (w) => w.source === "WHOOP" && w.scoreState === "SCORED" && w.strain != null,
+  );
   const avgStrain =
     scored.length > 0
       ? scored.reduce((a, w) => a + (w.strain ?? 0), 0) / scored.length
@@ -194,7 +194,7 @@ export default async function LiftingPage({
 
   const strainTrend = [...lift30]
     .reverse()
-    .filter((w) => w.strain != null)
+    .filter((w) => w.source === "WHOOP" && w.strain != null)
     .map((w) => ({
       date: shortDay(w.startAt),
       strain: Number((w.strain ?? 0).toFixed(2)),
@@ -238,18 +238,18 @@ export default async function LiftingPage({
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Sessions" value={String(sessionCount)} hint="WHOOP · 7d" />
+        <StatCard title="Sessions" value={String(sessionCount)} hint="WHOOP + Strava · 7d" />
         <StatCard
           title="Time training"
           value={totalSec > 0 ? secondsToHhMm(Math.round(totalSec)) : "—"}
-          hint="WHOOP · 7d"
+          hint="WHOOP + Strava · 7d"
         />
         <StatCard
           title="Avg strain"
           value={avgStrain != null ? avgStrain.toFixed(1) : "—"}
           hint="Scored workouts · 7d"
         />
-        <StatCard title="Avg HR" value={avgHr != null ? `${avgHr} bpm` : "—"} hint="WHOOP · 7d" />
+        <StatCard title="Avg HR" value={avgHr != null ? `${avgHr} bpm` : "—"} hint="WHOOP + Strava · 7d" />
       </section>
 
       <div>
@@ -284,7 +284,7 @@ export default async function LiftingPage({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Session duration" description="Minutes · WHOOP start→end">
+        <ChartCard title="Session duration" description="Minutes · session start→end">
           <BarChartView data={durationTrend} xKey="date" yKey="min" color={chartPalette.amazon} yUnit=" min" />
         </ChartCard>
         <ChartCard title="Workout heart rate" description="Avg and max per session · last 30d">
@@ -351,7 +351,7 @@ export default async function LiftingPage({
                 : "Set weekly targets and tag workouts below"
             }
           />
-          <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-amber-900/10 bg-card/55 p-4 text-sm shadow-sm shadow-yellow-950/[0.04]">
+          <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[color:var(--color-border-subtle)] bg-card/55 p-4 text-sm shadow-sm shadow-black/[0.04]">
             <div className="shrink-0 text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
               Current week counts
             </div>
@@ -385,7 +385,7 @@ export default async function LiftingPage({
       <section>
         <ChartCard
           title="Recent strength workouts"
-          description="Last 40 WHOOP sessions in the last 30 days, newest first — set session type per row"
+          description="Last 40 lifting sessions in the last 30 days (WHOOP + Strava), newest first — session type tagging is WHOOP-only"
           contentClassName="pt-0"
         >
           <div className="overflow-x-auto">
@@ -410,25 +410,38 @@ export default async function LiftingPage({
                 {tableRows.length > 0 ? (
                   tableRows.map((w) => {
                     const sec = (w.endAt.getTime() - w.startAt.getTime()) / 1000;
+                    const isWhoop = w.source === "WHOOP";
                     return (
                       <tr
-                        key={w.id}
-                        className="border-t border-amber-900/[0.06] transition-colors hover:bg-amber-50/30"
+                        key={`${w.source}:${w.id}`}
+                        className="border-t border-[color:var(--color-border-subtle)] transition-colors hover:bg-[color:var(--ui-accent-soft)]"
                       >
                         <td className="whitespace-nowrap px-3 py-2.5 text-stone-500">
                           {formatZonedDateTimeLiftingCell(w.startAt, tz)}
                         </td>
                         <td className="px-3 py-2.5 align-middle">
-                          <WhoopLiftTypeSelect
-                            workoutId={w.id}
-                            initial={w.liftSessionTemplate}
-                          />
+                          {isWhoop ? (
+                            <WhoopLiftTypeSelect
+                              workoutId={w.id}
+                              initial={w.liftSessionTemplate}
+                            />
+                          ) : (
+                            <span className="text-xs text-[color:var(--color-text-tertiary)]">—</span>
+                          )}
                         </td>
                         <td className="px-3 py-2.5">
-                          <span className="rounded-md bg-amber-100/80 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-stone-700 uppercase">
-                            WHOOP
+                          <span
+                            className={
+                              isWhoop
+                                ? "rounded-md bg-[color:var(--ui-accent-soft)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[color:var(--ui-accent)] uppercase"
+                                : "rounded-md bg-[color:var(--ui-accent-2-soft)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[color:var(--ui-accent-2)] uppercase"
+                            }
+                          >
+                            {isWhoop ? "WHOOP" : "STRAVA"}
                           </span>
-                          <div className="mt-0.5 font-medium text-stone-900">{formatSportLabel(w.sportName)}</div>
+                          <div className="mt-0.5 font-medium text-[color:var(--color-text-primary)]">
+                            {formatSportLabel(w.sportName)}
+                          </div>
                         </td>
                         <td className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
                           {sec > 0 ? secondsToHhMm(Math.round(sec)) : "—"}

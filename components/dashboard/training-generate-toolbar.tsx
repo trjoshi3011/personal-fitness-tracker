@@ -51,13 +51,13 @@ export function TrainingGenerateToolbar({
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href={`/training?ws=${prevKey}`}
-          className="rounded-md border border-amber-900/12 bg-card px-2 py-1 text-xs text-stone-600 transition-colors hover:bg-amber-50/50"
+          className="rounded-md border border-[color:var(--color-border-default)] bg-card px-2 py-1 text-xs text-[color:var(--color-text-secondary)] transition-colors hover:bg-[color:var(--ui-accent-soft)]"
         >
           Prev 2 weeks
         </Link>
         <Link
           href={`/training?ws=${nextKey}`}
-          className="rounded-md border border-amber-900/12 bg-card px-2 py-1 text-xs text-stone-600 transition-colors hover:bg-amber-50/50"
+          className="rounded-md border border-[color:var(--color-border-default)] bg-card px-2 py-1 text-xs text-[color:var(--color-text-secondary)] transition-colors hover:bg-[color:var(--ui-accent-soft)]"
         >
           Next 2 weeks
         </Link>
@@ -65,14 +65,16 @@ export function TrainingGenerateToolbar({
           type="button"
           disabled={busy}
           onClick={() => void onGenerate()}
-          className="inline-flex items-center gap-1.5 rounded-md border border-amber-900/15 bg-gradient-to-r from-amber-50/80 via-yellow-50/70 to-rose-50/50 px-3 py-1 text-xs font-medium text-stone-800 transition-colors hover:bg-amber-50/70 disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-md border border-[color:var(--color-border-default)] bg-[image:linear-gradient(90deg,var(--ui-accent-soft),var(--ui-accent-2-soft),var(--ui-accent-3-soft))] px-3 py-1 text-xs font-medium text-[color:var(--color-text-primary)] transition-colors hover:bg-[color:var(--ui-accent-soft)] disabled:opacity-60"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
           Generate / refresh plan
         </button>
       </div>
       {error ? (
-        <p className="text-xs text-rose-700">{error}</p>
+        <p className="text-xs text-[color:color-mix(in_srgb,var(--ui-danger)_72%,var(--color-text-primary))]">
+          {error}
+        </p>
       ) : null}
     </div>
   );

@@ -7,7 +7,7 @@ import { MultiLineChartView } from "@/components/charts/multi-line-chart";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { fetchStravaRunsInRange, fetchStravaRunStartsInRange } from "@/lib/merged-runs";
-import { WHOOP_LIFTING_SPORT_NAMES } from "@/lib/whoop-lifting-sports";
+import { fetchMergedLiftStartsInRange } from "@/lib/merged-lifts";
 import {
   activeZonedDaysOfMonth,
   parseCalendarYearMonth,
@@ -205,18 +205,7 @@ export default async function OverviewPage({
 
   const [runStartsMonth, liftStartsMonth] = await Promise.all([
     fetchStravaRunStartsInRange(userId, monthRange.start, monthRange.end),
-    prisma().whoopWorkout.findMany({
-      where: {
-        userId,
-        startAt: { gte: monthRange.start, lt: monthRange.end },
-        OR: [
-          { sportName: { in: [...WHOOP_LIFTING_SPORT_NAMES] } },
-          { sportName: { startsWith: "weightlifting", mode: "insensitive" } },
-        ],
-      },
-      select: { startAt: true },
-      orderBy: { startAt: "asc" },
-    }).then((rows) => rows.map((r) => r.startAt)),
+    fetchMergedLiftStartsInRange(userId, monthRange.start, monthRange.end),
   ]);
 
   const activeRunDays = activeZonedDaysOfMonth(runStartsMonth, tz, cal.year, cal.month1);

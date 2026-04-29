@@ -3,12 +3,19 @@ import { Footprints, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PlannedSession, TrainingPlanPayload } from "@/lib/gemini-training-plan";
 
-const RUN = "bg-amber-500/15 text-amber-900 ring-amber-500/30";
-const REST = "bg-stone-100/70 text-stone-600 ring-stone-300/40";
+const RUN =
+  "bg-[color:color-mix(in_srgb,var(--ui-run)_22%,transparent)] text-[color:var(--color-text-primary)] ring-[color:color-mix(in_srgb,var(--ui-run)_42%,transparent)]";
+const REST =
+  "bg-[color:color-mix(in_srgb,var(--color-bg-elevated)_75%,transparent)] text-[color:var(--color-text-secondary)] ring-[color:var(--color-border-subtle)]";
 
 function SessionIcon({ type }: { type: PlannedSession["type"] }) {
-  if (type === "run") return <Footprints className="h-3.5 w-3.5 shrink-0 text-amber-600" />;
-  return <Moon className="h-3.5 w-3.5 shrink-0 text-stone-500" />;
+  if (type === "run")
+    return (
+      <Footprints className="h-3.5 w-3.5 shrink-0 text-[color:var(--ui-run)]" />
+    );
+  return (
+    <Moon className="h-3.5 w-3.5 shrink-0 text-[color:var(--color-text-tertiary)]" />
+  );
 }
 
 function sessionTone(type: PlannedSession["type"]) {
@@ -50,18 +57,18 @@ function WeekRow({
           return (
             <div
               key={`${weekLabel}-${label}-${dateKey}`}
-              className="flex min-h-[180px] flex-col rounded-xl border border-amber-900/10 bg-card/55 p-3 shadow-sm shadow-yellow-950/[0.04]"
+              className="flex min-h-[180px] flex-col rounded-xl border border-[color:var(--color-border-subtle)] bg-card/55 p-3 shadow-sm"
             >
-              <div className="border-b border-amber-900/10 pb-2">
-                <div className="text-[10px] font-semibold tracking-wider text-stone-400 uppercase">
+              <div className="border-b border-[color:var(--color-border-subtle)] pb-2">
+                <div className="text-[10px] font-semibold tracking-wider text-[color:var(--color-text-tertiary)] uppercase">
                   {label}
                 </div>
-                <div className="text-xs text-stone-500">{dateKey}</div>
-                <div className="text-sm font-semibold text-stone-900">{dom}</div>
+                <div className="text-xs text-[color:var(--color-text-tertiary)]">{dateKey}</div>
+                <div className="text-sm font-semibold text-[color:var(--color-text-primary)]">{dom}</div>
               </div>
               <div className="mt-2 flex flex-1 flex-col gap-2">
                 {!sessions || sessions.length === 0 ? (
-                  <p className="text-xs leading-relaxed text-stone-500">
+                  <p className="text-xs leading-relaxed text-[color:var(--color-text-tertiary)]">
                     {plan ? "No sessions for this day." : "Generate a plan to see workouts."}
                   </p>
                 ) : (
@@ -76,9 +83,9 @@ function WeekRow({
                       <div className="flex items-start gap-2">
                         <SessionIcon type={s.type} />
                         <div className="min-w-0 flex-1">
-                          <div className="font-semibold leading-snug text-stone-900">{s.title}</div>
+                          <div className="font-semibold leading-snug text-[color:var(--color-text-primary)]">{s.title}</div>
                           {s.details ? (
-                            <p className="mt-1 leading-relaxed text-stone-600">{s.details}</p>
+                            <p className="mt-1 leading-relaxed text-[color:var(--color-text-secondary)]">{s.details}</p>
                           ) : null}
                         </div>
                       </div>

@@ -21,24 +21,30 @@ const TYPE_ORDER: LiftSessionTemplate[] = ["PUSH", "PULL", "LEGS"];
 
 /** Solid highlight classes (single type, no untagged). */
 const TYPE_CELL_CLASS: Record<LiftSessionTemplate, string> = {
-  PUSH: "bg-rose-400/20 font-medium text-stone-800 ring-1 ring-rose-400/28",
-  PULL: "bg-sky-400/20 font-medium text-stone-800 ring-1 ring-sky-400/28",
-  LEGS: "bg-amber-400/22 font-medium text-stone-800 ring-1 ring-amber-500/30",
+  PUSH:
+    "bg-[color:color-mix(in_srgb,var(--ui-accent-3)_22%,transparent)] font-medium text-[color:var(--color-text-primary)] ring-1 ring-[color:color-mix(in_srgb,var(--ui-accent-3)_42%,transparent)]",
+  PULL:
+    "bg-[color:color-mix(in_srgb,var(--ui-accent-2)_22%,transparent)] font-medium text-[color:var(--color-text-primary)] ring-1 ring-[color:color-mix(in_srgb,var(--ui-accent-2)_42%,transparent)]",
+  LEGS:
+    "bg-[color:color-mix(in_srgb,var(--ui-accent)_22%,transparent)] font-medium text-[color:var(--color-text-primary)] ring-1 ring-[color:color-mix(in_srgb,var(--ui-accent)_42%,transparent)]",
 };
 
 const UNTAGGED_ONLY_CLASS =
   "bg-stone-300/22 font-medium text-stone-800 ring-1 ring-stone-400/30";
 
-const TYPE_RGB: Record<LiftSessionTemplate, string> = {
-  PUSH: "251 113 133",
-  PULL: "56 189 248",
-  LEGS: "251 191 36",
+const TYPE_COLOR: Record<LiftSessionTemplate, string> = {
+  PUSH: "var(--ui-accent-3)",
+  PULL: "var(--ui-accent-2)",
+  LEGS: "var(--ui-accent)",
 };
 
 const LEGEND_SWATCH: Record<LiftSessionTemplate, string> = {
-  PUSH: "bg-rose-400/35 ring-1 ring-rose-500/25",
-  PULL: "bg-sky-400/35 ring-1 ring-sky-500/25",
-  LEGS: "bg-amber-400/40 ring-1 ring-amber-600/25",
+  PUSH:
+    "bg-[color:color-mix(in_srgb,var(--ui-accent-3)_22%,transparent)] ring-1 ring-[color:color-mix(in_srgb,var(--ui-accent-3)_42%,transparent)]",
+  PULL:
+    "bg-[color:color-mix(in_srgb,var(--ui-accent-2)_22%,transparent)] ring-1 ring-[color:color-mix(in_srgb,var(--ui-accent-2)_42%,transparent)]",
+  LEGS:
+    "bg-[color:color-mix(in_srgb,var(--ui-accent)_22%,transparent)] ring-1 ring-[color:color-mix(in_srgb,var(--ui-accent)_42%,transparent)]",
 };
 
 function multiTypeGradient(types: LiftSessionTemplate[]): string {
@@ -48,9 +54,10 @@ function multiTypeGradient(types: LiftSessionTemplate[]): string {
     const t = types[i];
     const lo = (i / n) * 100;
     const hi = ((i + 1) / n) * 100;
+    const color = `color-mix(in srgb, ${TYPE_COLOR[t]} 22%, transparent)`;
     parts.push(
-      `rgb(${TYPE_RGB[t]} / 0.22) ${lo}%`,
-      `rgb(${TYPE_RGB[t]} / 0.22) ${hi}%`,
+      `${color} ${lo}%`,
+      `${color} ${hi}%`,
     );
   }
   return `linear-gradient(90deg, ${parts.join(", ")})`;
@@ -60,7 +67,7 @@ function liftDayCellLook(bucket: LiftDayBucket | undefined): {
   className: string;
   style?: CSSProperties;
 } {
-  const empty = "text-stone-500 hover:bg-stone-100/50";
+  const empty = "text-stone-500 hover:bg-[color:var(--ui-accent-soft)]";
   if (!bucket) return { className: empty };
 
   const hasTagged = bucket.templates.length > 0;
@@ -79,10 +86,11 @@ function liftDayCellLook(bucket: LiftDayBucket | undefined): {
 
   if (uniq.length === 1 && hasUntagged) {
     const t = uniq[0];
+    const color = `color-mix(in srgb, ${TYPE_COLOR[t]} 22%, transparent)`;
     return {
       className: "font-medium text-stone-800 ring-1 ring-stone-400/28",
       style: {
-        background: `linear-gradient(180deg, rgb(${TYPE_RGB[t]} / 0.22) 0%, rgb(${TYPE_RGB[t]} / 0.22) 58%, rgb(214 211 209 / 0.4) 58%, rgb(214 211 209 / 0.4) 100%)`,
+        background: `linear-gradient(180deg, ${color} 0%, ${color} 58%, color-mix(in srgb, var(--color-bg-inset) 40%, transparent) 58%, color-mix(in srgb, var(--color-bg-inset) 40%, transparent) 100%)`,
       },
     };
   }
@@ -92,7 +100,7 @@ function liftDayCellLook(bucket: LiftDayBucket | undefined): {
     return {
       className: "font-medium text-stone-800 ring-2 ring-stone-400/35",
       style: {
-        backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 62%, rgb(214 211 209 / 0.4) 62%), ${bg}`,
+        backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 62%, color-mix(in srgb, var(--color-bg-inset) 40%, transparent) 62%), ${bg}`,
       },
     };
   }
@@ -144,8 +152,8 @@ export function LiftingTypeMonthCalendar({
     <Card className={cn("flex min-h-0 flex-1 flex-col border-0 shadow-none", className)}>
       <CardHeader className="flex shrink-0 flex-row items-center justify-between gap-3 pb-2">
         <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-rose-400/15">
-            <Dumbbell className="h-3 w-3 text-rose-500" />
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[color:var(--ui-accent-soft)]">
+            <Dumbbell className="h-3 w-3 text-[color:var(--ui-accent)]" />
           </div>
           <div>
             <CardTitle className="text-sm leading-tight">{title}</CardTitle>
@@ -155,13 +163,13 @@ export function LiftingTypeMonthCalendar({
         <div className="flex items-center gap-1">
           <Link
             href={`${basePath}${qs(prev.year, prev.month1)}`}
-            className="rounded-md border border-amber-900/12 bg-card px-1.5 py-0.5 text-[11px] text-stone-600 transition-colors hover:bg-amber-50/50"
+            className="rounded-md border border-[color:var(--color-border-default)] bg-card px-1.5 py-0.5 text-[11px] text-[color:var(--color-text-secondary)] transition-colors hover:bg-[color:var(--ui-accent-soft)]"
           >
             &lsaquo;
           </Link>
           <Link
             href={`${basePath}${qs(next.year, next.month1)}`}
-            className="rounded-md border border-amber-900/12 bg-card px-1.5 py-0.5 text-[11px] text-stone-600 transition-colors hover:bg-amber-50/50"
+            className="rounded-md border border-[color:var(--color-border-default)] bg-card px-1.5 py-0.5 text-[11px] text-[color:var(--color-text-secondary)] transition-colors hover:bg-[color:var(--ui-accent-soft)]"
           >
             &rsaquo;
           </Link>
@@ -220,7 +228,7 @@ export function LiftingTypeMonthCalendar({
           })}
         </div>
 
-        <div className="mt-2 shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-amber-900/10 pt-2 text-[9px] text-stone-500">
+        <div className="mt-2 shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[color:var(--color-border-subtle)] pt-2 text-[9px] text-[color:var(--color-text-tertiary)]">
           {TYPE_ORDER.map((t) => (
             <span key={t} className="flex items-center gap-1">
               <span

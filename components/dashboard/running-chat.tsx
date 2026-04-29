@@ -306,11 +306,11 @@ export function RunningChat() {
           });
           setCollapsed(false);
         }}
-        className="fixed right-5 bottom-5 z-40 inline-flex items-center gap-2 rounded-full border border-amber-900/20 bg-card px-4 py-2 text-sm font-medium text-stone-800 shadow-md transition-colors hover:bg-amber-50"
+        className="fixed right-5 bottom-5 z-40 inline-flex items-center gap-2 rounded-full border border-[color:var(--color-border-default)] bg-card px-4 py-2 text-sm font-medium text-[color:var(--color-text-primary)] shadow-md transition-colors hover:bg-[color:var(--ui-accent-soft)]"
       >
-        <MessageCircle className="h-4 w-4 text-orange-600" />
+        <MessageCircle className="h-4 w-4 text-[color:var(--ui-accent)]" />
         Coach Chat
-        <ChevronUp className="h-4 w-4 text-stone-500" />
+        <ChevronUp className="h-4 w-4 text-[color:var(--color-text-tertiary)]" />
       </button>
     );
   }
@@ -318,25 +318,25 @@ export function RunningChat() {
   return (
     <div
       style={{ left: panel.x, top: panel.y, width: panel.width, height: panel.height }}
-      className="fixed z-40 flex flex-col rounded-2xl border border-amber-900/20 bg-card shadow-lg"
+      className="fixed z-40 flex flex-col rounded-2xl border border-[color:var(--color-border-default)] bg-card shadow-lg"
     >
       <div
         onPointerDown={startMove}
-        className="flex cursor-move items-center justify-between gap-3 border-b border-amber-900/10 px-4 py-3"
+        className="flex cursor-move items-center justify-between gap-3 border-b border-[color:var(--color-border-subtle)] px-4 py-3"
       >
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[image:linear-gradient(135deg,var(--ui-accent)_0%,var(--ui-accent-2)_100%)]">
             <MessageCircle className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-stone-900">Running Coach Chat</h2>
-            <p className="text-[11px] text-stone-500">Uses your last 3 weeks of run data</p>
+            <h2 className="text-sm font-semibold text-[color:var(--color-text-primary)]">Running Coach Chat</h2>
+            <p className="text-[11px] text-[color:var(--color-text-tertiary)]">Uses your last 3 weeks of run data</p>
           </div>
         </div>
         <button
           type="button"
           onClick={() => setCollapsed(true)}
-          className="inline-flex h-8 items-center gap-1 rounded-lg border border-amber-900/15 bg-background/60 px-2 text-xs font-medium text-stone-600 transition-colors hover:bg-amber-50/60 hover:text-stone-800"
+          className="inline-flex h-8 items-center gap-1 rounded-lg border border-[color:var(--color-border-default)] bg-[color:color-mix(in_srgb,var(--background)_60%,transparent)] px-2 text-xs font-medium text-[color:var(--color-text-secondary)] transition-colors hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)]"
           aria-label="Collapse coach chat"
         >
           <ChevronDown className="h-3.5 w-3.5" />
@@ -347,7 +347,7 @@ export function RunningChat() {
       <div className="flex min-h-0 flex-1 flex-col space-y-2 px-4 py-3">
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-xl border border-amber-900/15 bg-stone-50 p-3"
+          className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-xl border border-[color:var(--color-border-default)] bg-[color:color-mix(in_srgb,var(--color-bg-surface)_82%,transparent)] p-3"
         >
           {messages.map((msg, idx) => (
             <div
@@ -355,15 +355,15 @@ export function RunningChat() {
               className={cn(
                 "max-w-[94%] rounded-xl px-3 py-2 text-sm leading-relaxed",
                 msg.role === "user"
-                  ? "ml-auto bg-stone-900 text-white"
-                  : "mr-auto border border-amber-900/12 bg-amber-50/50 text-stone-700",
+                  ? "ml-auto bg-[color:var(--color-text-primary)] text-[color:var(--color-text-inverse)]"
+                  : "mr-auto border border-[color:var(--color-border-subtle)] bg-[color:var(--ui-accent-soft)] text-[color:var(--color-text-secondary)]",
               )}
             >
               <div className="whitespace-pre-wrap break-words">{msg.content}</div>
             </div>
           ))}
           {loading && (
-            <div className="mr-auto inline-flex items-center gap-2 rounded-xl border border-amber-900/12 bg-amber-50/50 px-3 py-2 text-sm text-stone-700">
+            <div className="mr-auto inline-flex items-center gap-2 rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--ui-accent-soft)] px-3 py-2 text-sm text-[color:var(--color-text-secondary)]">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Thinking...
             </div>
@@ -371,7 +371,7 @@ export function RunningChat() {
         </div>
 
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50/60 px-3 py-2 text-xs text-red-700">
+          <div className="rounded-xl border border-[color:color-mix(in_srgb,var(--ui-danger)_35%,transparent)] bg-[color:var(--ui-danger-soft)] px-3 py-2 text-xs text-[color:color-mix(in_srgb,var(--ui-danger)_72%,var(--color-text-primary))]">
             {error}
           </div>
         )}
@@ -381,14 +381,14 @@ export function RunningChat() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about your upcoming training..."
-            className="h-10 flex-1 rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+            className="h-10 flex-1 rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:var(--ui-accent)] focus:ring-2 focus:ring-[color:var(--ring)]"
             maxLength={1200}
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-stone-900 px-3 text-sm font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-50"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[color:var(--ui-accent)] px-3 text-sm font-medium text-[color:var(--color-text-inverse)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--ui-accent)_88%,black)] disabled:opacity-50"
           >
             <SendHorizonal className="h-4 w-4" />
             Send

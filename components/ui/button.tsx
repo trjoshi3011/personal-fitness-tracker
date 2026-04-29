@@ -9,11 +9,11 @@ type ButtonSize = "default" | "sm" | "icon";
 
 const variantClasses: Record<ButtonVariant, string> = {
   default:
-    "bg-stone-900 text-white hover:bg-stone-800",
+    "bg-[color:var(--ui-accent)] text-[color:var(--color-text-inverse)] hover:bg-[color:color-mix(in_srgb,var(--ui-accent)_88%,#000)]",
   secondary:
-    "border border-amber-950/15 bg-card text-stone-700 hover:border-yellow-600/35 hover:bg-yellow-50/85 hover:text-yellow-900",
+    "border border-[color:var(--color-border-default)] bg-card text-[color:var(--color-text-secondary)] hover:border-[color:color-mix(in_srgb,var(--ui-accent)_32%,transparent)] hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)]",
   ghost:
-    "text-stone-500 hover:bg-yellow-950/5 hover:text-stone-700",
+    "text-[color:var(--color-text-tertiary)] hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)]",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -37,7 +37,7 @@ function Button({
       type={type}
       data-slot="button"
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-yellow-600/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
         variantClasses[variant],
         sizeClasses[size],
         className,

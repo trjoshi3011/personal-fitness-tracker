@@ -263,7 +263,7 @@ export default async function RunningPage({
             data={whoopRecStrainChart}
             xKey="day"
             lines={[
-              { dataKey: "recovery", color: "#22c55e", name: "Recovery %", yAxisId: "left" },
+              { dataKey: "recovery", color: "var(--ui-accent)", name: "Recovery %", yAxisId: "left" },
               { dataKey: "strain", color: chartPalette.adobe, name: "Strain", yAxisId: "right" },
             ]}
             yDomain={[0, 100]}
@@ -286,11 +286,11 @@ export default async function RunningPage({
                 type="date"
                 name="shoeStartDate"
                 defaultValue={shoeStart ? toDateInputValue(shoeStart, tz) : ""}
-                className="h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                className="h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
               />
               <button
                 type="submit"
-                className="h-10 w-full rounded-xl border border-amber-900/15 bg-gradient-to-r from-amber-50/70 via-yellow-50/60 to-rose-50/60 px-3 text-sm font-medium text-stone-800 transition-colors hover:bg-amber-50/60"
+                className="h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card/70 px-3 text-sm font-medium text-[color:var(--color-text-primary)] transition-colors hover:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] hover:bg-[color:var(--ui-accent-soft)]"
               >
                 Save
               </button>
@@ -305,16 +305,16 @@ export default async function RunningPage({
               ) : null}
             </form>
 
-            <div className="rounded-xl border border-amber-900/10 bg-card/60 p-3">
+            <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-card/60 p-3">
               <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                 Miles on shoe
               </div>
               <div className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">
                 {shoeMilesMi != null ? shoeMilesMi.toFixed(1) : "—"}
               </div>
-              <div className="mt-2 h-2 w-full rounded-full bg-stone-100/60">
+              <div className="mt-2 h-2 w-full rounded-full bg-[color:color-mix(in_srgb,var(--ui-accent)_10%,transparent)]">
                 <div
-                  className="h-2 rounded-full bg-gradient-to-r from-amber-500/55 via-yellow-500/45 to-rose-400/45"
+                  className="h-2 rounded-full bg-[image:linear-gradient(90deg,var(--ui-accent),var(--ui-accent-2),var(--ui-accent-3))]"
                   style={{ width: `${shoePct ?? 0}%` }}
                   aria-hidden="true"
                 />
@@ -356,12 +356,15 @@ export default async function RunningPage({
                     const runPace = formatPaceMinPerMile(paceSecondsPerMile({ seconds: sec, meters }));
                     const elevFt = r.totalElevationM ? metersToFeet(r.totalElevationM) : null;
                     return (
-                      <tr key={r.rowKey} className="border-t border-amber-900/[0.06] transition-colors hover:bg-amber-50/30">
+                      <tr
+                        key={r.rowKey}
+                        className="border-t border-[color:var(--color-border-subtle)] transition-colors hover:bg-[color:var(--ui-accent-soft)]"
+                      >
                         <td className="whitespace-nowrap px-3 py-2.5 text-stone-500">
                           {formatZonedDateShortWithYear(r.startAt, tz)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2.5 text-stone-600">
-                          <span className="rounded-md bg-amber-100/80 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-stone-700 uppercase">
+                          <span className="rounded-md bg-[color:var(--ui-accent-soft)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[color:var(--color-text-secondary)] uppercase">
                             {r.source === "STRAVA" ? "Strava" : "Fitbit"}
                           </span>
                         </td>

@@ -19,10 +19,10 @@ export function StatCard({
 }) {
   const tone =
     trend?.tone === "up"
-      ? "text-yellow-700"
+      ? "text-[color:var(--ui-success)]"
       : trend?.tone === "down"
-        ? "text-rose-600"
-        : "text-stone-500";
+        ? "text-[color:var(--ui-danger)]"
+        : "text-[color:var(--color-text-tertiary)]";
 
   return (
     <Card
@@ -33,11 +33,11 @@ export function StatCard({
       )}
     >
       <div
-        className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-yellow-500 via-amber-500 to-yellow-800"
+        className="absolute left-0 top-0 h-full w-1 bg-[color:var(--ui-accent)]"
         aria-hidden="true"
       />
       <CardHeader className="shrink-0 pb-2 pl-6">
-        <CardTitle className="text-xs font-medium tracking-wider text-stone-500 uppercase">
+        <CardTitle className="text-xs font-medium tracking-wider text-[color:var(--color-text-tertiary)] uppercase">
           {title}
         </CardTitle>
       </CardHeader>
@@ -50,9 +50,9 @@ export function StatCard({
         )}
       >
         <div className="space-y-1">
-          <div className="text-2xl font-semibold tracking-tight text-stone-900">{value}</div>
+          <div className="text-2xl font-semibold tracking-tight text-[color:var(--color-text-primary)]">{value}</div>
           {hint ? (
-            <div className="text-xs text-stone-500">{hint}</div>
+            <div className="text-xs text-[color:var(--color-text-tertiary)]">{hint}</div>
           ) : null}
         </div>
         {trend ? (

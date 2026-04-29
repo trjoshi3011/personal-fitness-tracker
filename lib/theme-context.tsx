@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-export type ThemeId = "amber" | "whoop";
+export type ThemeId = "olive" | "lavender" | "terracotta";
 
 type ThemeContextValue = {
   theme: ThemeId;
@@ -10,19 +10,24 @@ type ThemeContextValue = {
 };
 
 const ThemeContext = React.createContext<ThemeContextValue>({
-  theme: "amber",
+  theme: "olive",
   setTheme: () => {},
 });
 
 export const THEME_STORAGE_KEY = "fitnessDashboardTheme.v1";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeRaw] = React.useState<ThemeId>("amber");
+  const [theme, setThemeRaw] = React.useState<ThemeId>("olive");
 
   React.useEffect(() => {
     try {
       const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
-      if (saved === "whoop") setThemeRaw("whoop");
+      if (saved === "olive" || saved === "lavender" || saved === "terracotta") {
+        setThemeRaw(saved);
+      } else if (saved === "whoop" || saved === "amber") {
+        // Back-compat: map previous themes into the new trio.
+        setThemeRaw("olive");
+      }
     } catch {
       /* ignore */
     }
@@ -31,11 +36,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setTheme = React.useCallback((t: ThemeId) => {
     setThemeRaw(t);
     try {
-      if (t === "whoop") {
-        document.documentElement.setAttribute("data-theme", "whoop");
-      } else {
-        document.documentElement.removeAttribute("data-theme");
-      }
+      document.documentElement.setAttribute("data-theme", t);
       window.localStorage.setItem(THEME_STORAGE_KEY, t);
     } catch {
       /* ignore */

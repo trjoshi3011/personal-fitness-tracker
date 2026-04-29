@@ -29,8 +29,9 @@ const navItems = [
 ] as const;
 
 const themes: { id: ThemeId; label: string; swatch: string }[] = [
-  { id: "amber", label: "Amber", swatch: "#d97706" },
-  { id: "whoop", label: "WHOOP", swatch: "#22c55e" },
+  { id: "olive", label: "Olive", swatch: "#6B7A3E" },
+  { id: "lavender", label: "Lavender", swatch: "#9B8EC4" },
+  { id: "terracotta", label: "Terracotta", swatch: "#C4856A" },
 ];
 
 const SCROLL_TOP_SHOW_PX = 24;
@@ -127,13 +128,16 @@ export function TopNav() {
             <button
               type="button"
               tabIndex={profileVisible ? 0 : -1}
-              className="flex items-center gap-2 rounded-xl px-2 py-1.5 outline-none transition-colors hover:bg-yellow-950/5 focus-visible:ring-2 focus-visible:ring-yellow-600/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="flex items-center gap-2 rounded-xl px-2 py-1.5 outline-none transition-colors hover:bg-[color:var(--ui-accent-soft)] focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               aria-label="Theme"
             >
               <Palette className="h-4 w-4 text-stone-600" />
               <span
                 className="h-2 w-2 rounded-full ring-1 ring-black/5"
-                style={{ backgroundColor: themes.find((t) => t.id === theme)?.swatch ?? "#d97706" }}
+                style={{
+                  backgroundColor:
+                    themes.find((t) => t.id === theme)?.swatch ?? "var(--ui-accent)",
+                }}
                 aria-hidden
               />
               <span className="hidden text-xs font-medium text-stone-700 md:inline">
@@ -170,7 +174,7 @@ export function TopNav() {
             <button
               type="button"
               tabIndex={profileVisible ? 0 : -1}
-              className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 outline-none transition-colors hover:bg-yellow-950/5 focus-visible:ring-2 focus-visible:ring-yellow-600/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 outline-none transition-colors hover:bg-[color:var(--ui-accent-soft)] focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <Avatar>
                 <AvatarFallback>TJ</AvatarFallback>

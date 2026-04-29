@@ -20,15 +20,18 @@ type AiInsightsResult = {
 };
 
 const PRIORITY_STYLES: Record<string, string> = {
-  high: "border-orange-500/30 bg-orange-50/50",
-  medium: "border-amber-500/20 bg-amber-50/30",
-  low: "border-stone-300/30 bg-stone-50/30",
+  high:
+    "border-[color:color-mix(in_srgb,var(--ui-accent-3)_45%,transparent)] bg-[color:var(--ui-accent-3-soft)]",
+  medium:
+    "border-[color:color-mix(in_srgb,var(--ui-accent-2)_45%,transparent)] bg-[color:var(--ui-accent-2-soft)]",
+  low:
+    "border-[color:var(--color-border-subtle)] bg-[color:color-mix(in_srgb,var(--color-bg-elevated)_70%,transparent)]",
 };
 
 const PRIORITY_DOT: Record<string, string> = {
-  high: "bg-orange-500",
-  medium: "bg-amber-500",
-  low: "bg-stone-400",
+  high: "bg-[color:var(--ui-accent-3)]",
+  medium: "bg-[color:var(--ui-accent-2)]",
+  low: "bg-[color:color-mix(in_srgb,var(--ui-accent)_55%,var(--color-text-tertiary))]",
 };
 
 function InsightCard({ section }: { section: InsightSection }) {
@@ -100,18 +103,18 @@ export function AiInsights() {
   }, [generate]);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-amber-900/12 bg-card/80 shadow-sm">
+    <div className="overflow-hidden rounded-2xl border border-[color:var(--color-border-subtle)] bg-card/80 shadow-sm">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-amber-900/8 px-5 py-4">
+      <div className="flex items-center justify-between gap-3 border-b border-[color:var(--color-border-subtle)]/70 px-5 py-4">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 shadow-sm">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[image:linear-gradient(135deg,var(--ui-accent)_0%,var(--ui-accent-2)_100%)] shadow-sm">
             <Sparkles className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-stone-900">
+            <h2 className="text-sm font-semibold text-[color:var(--color-text-primary)]">
               AI Coach Insights
             </h2>
-            <p className="text-[11px] text-stone-500">
+            <p className="text-[11px] text-[color:var(--color-text-tertiary)]">
               Powered by Gemini — not medical advice
             </p>
           </div>
@@ -121,7 +124,7 @@ export function AiInsights() {
             type="button"
             onClick={generate}
             disabled={loading}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-900/15 bg-background/60 px-3 text-xs font-medium text-stone-600 transition-all hover:bg-amber-50/60 hover:text-stone-800 disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[color:var(--color-border-default)] bg-[color:color-mix(in_srgb,var(--background)_60%,transparent)] px-3 text-xs font-medium text-[color:var(--color-text-secondary)] transition-all hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)] disabled:opacity-50"
           >
             <RefreshCw
               className={cn("h-3 w-3", loading && "animate-spin")}
@@ -132,7 +135,7 @@ export function AiInsights() {
             <button
               type="button"
               onClick={() => setCollapsed((c) => !c)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-stone-500 transition-colors hover:bg-amber-50/60 hover:text-stone-700"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--color-text-tertiary)] transition-colors hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-secondary)]"
               aria-label={collapsed ? "Expand insights" : "Collapse insights"}
             >
               {collapsed ? (
@@ -150,16 +153,16 @@ export function AiInsights() {
         {loading && !result && (
           <div className="flex flex-col items-center gap-3 py-10">
             <div className="relative h-10 w-10">
-              <div className="absolute inset-0 animate-ping rounded-full bg-amber-400/30" />
-              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500">
+              <div className="absolute inset-0 animate-ping rounded-full bg-[color:var(--ui-accent-soft)]" />
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-[image:linear-gradient(135deg,var(--ui-accent)_0%,var(--ui-accent-2)_100%)]">
                 <Sparkles className="h-5 w-5 text-white" />
               </div>
             </div>
             <div className="space-y-1 text-center">
-              <p className="text-sm font-medium text-stone-700">
+              <p className="text-sm font-medium text-[color:var(--color-text-secondary)]">
                 Analyzing your data…
               </p>
-              <p className="text-xs text-stone-500">
+              <p className="text-xs text-[color:var(--color-text-tertiary)]">
                 Reviewing 30 days of activity, sleep, and recovery metrics
               </p>
             </div>
@@ -167,7 +170,7 @@ export function AiInsights() {
         )}
 
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50/60 p-4 text-sm text-red-800">
+          <div className="rounded-xl border border-[color:color-mix(in_srgb,var(--ui-danger)_35%,transparent)] bg-[color:var(--ui-danger-soft)] p-4 text-sm text-[color:color-mix(in_srgb,var(--ui-danger)_72%,var(--color-text-primary))]">
             {error}
           </div>
         )}
@@ -175,8 +178,8 @@ export function AiInsights() {
         {result && (
           <div className={cn("space-y-4", collapsed && "hidden")}>
             {/* Summary */}
-            <div className="rounded-xl border border-amber-500/15 bg-gradient-to-r from-amber-50/60 via-yellow-50/40 to-orange-50/30 p-4">
-              <p className="text-sm font-medium leading-relaxed text-stone-800">
+            <div className="rounded-xl border border-[color:color-mix(in_srgb,var(--ui-accent)_28%,transparent)] bg-[image:linear-gradient(90deg,var(--ui-accent-soft),var(--ui-accent-2-soft),var(--ui-accent-3-soft))] p-4">
+              <p className="text-sm font-medium leading-relaxed text-[color:var(--color-text-secondary)]">
                 {result.summary}
               </p>
             </div>
@@ -195,7 +198,7 @@ export function AiInsights() {
 
             {/* Footer */}
             {result.generatedAt && (
-              <p className="text-[11px] text-stone-400">
+              <p className="text-[11px] text-[color:var(--color-text-tertiary)]">
                 Generated{" "}
                 {formatZonedDateTimeMedium(new Date(result.generatedAt), timeZone)}
               </p>

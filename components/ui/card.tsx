@@ -7,7 +7,7 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "rounded-2xl border border-amber-950/12 bg-card text-card-foreground shadow-sm shadow-yellow-950/[0.05] backdrop-blur-sm transition-colors hover:border-yellow-600/30 hover:bg-yellow-50/40 hover:shadow-md hover:shadow-yellow-950/[0.07]",
+        "rounded-2xl border border-[color:var(--color-border-subtle)] bg-card text-card-foreground shadow-sm shadow-black/[0.04] backdrop-blur-sm transition-colors hover:border-[color:color-mix(in_srgb,var(--ui-accent)_28%,transparent)] hover:bg-[color:var(--ui-accent-soft)] hover:shadow-md hover:shadow-black/[0.06]",
         className,
       )}
       {...props}
@@ -29,7 +29,10 @@ function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
   return (
     <h3
       data-slot="card-title"
-      className={cn("text-sm font-semibold leading-none tracking-tight text-stone-900", className)}
+      className={cn(
+        "text-sm font-semibold leading-none tracking-tight text-[color:var(--color-text-primary)]",
+        className,
+      )}
       {...props}
     />
   );
@@ -39,7 +42,7 @@ function CardDescription({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <p
       data-slot="card-description"
-      className={cn("text-sm text-stone-500", className)}
+      className={cn("text-sm text-[color:var(--color-text-tertiary)]", className)}
       {...props}
     />
   );

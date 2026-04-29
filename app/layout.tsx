@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   description: "Personal fitness tracking dashboard",
 };
 
-const themeScript = `try{if(localStorage.getItem('${THEME_STORAGE_KEY}')==='whoop'){document.documentElement.setAttribute('data-theme','whoop')}}catch{}`;
+const themeScript = `try{const t=localStorage.getItem('${THEME_STORAGE_KEY}');if(t==='olive'||t==='lavender'||t==='terracotta'){document.documentElement.setAttribute('data-theme',t)}else{document.documentElement.setAttribute('data-theme','olive')}}catch{document.documentElement.setAttribute('data-theme','olive')}`;
 
 export default function RootLayout({
   children,

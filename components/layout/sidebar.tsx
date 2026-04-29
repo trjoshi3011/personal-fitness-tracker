@@ -49,11 +49,16 @@ export function Sidebar() {
               className={cn(
                 "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-all",
                 active
-                  ? "border border-yellow-600/25 bg-yellow-500/10 font-medium text-stone-900 shadow-sm shadow-yellow-950/5"
-                  : "border border-transparent text-stone-500 hover:border-yellow-600/15 hover:bg-yellow-950/[0.05] hover:text-stone-700",
+                  ? "border border-[color:color-mix(in_srgb,var(--ui-accent)_32%,transparent)] bg-[color:var(--ui-accent-soft)] font-medium text-[color:var(--color-text-primary)] shadow-sm shadow-black/[0.04]"
+                  : "border border-transparent text-[color:var(--color-text-tertiary)] hover:border-[color:color-mix(in_srgb,var(--ui-accent)_24%,transparent)] hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-secondary)]",
               )}
             >
-              <Icon className={cn("h-4 w-4", active ? "text-yellow-700" : "")} />
+              <Icon
+                className={cn(
+                  "h-4 w-4",
+                  active ? "text-[color:var(--ui-accent)]" : "",
+                )}
+              />
               {item.label}
             </Link>
           );

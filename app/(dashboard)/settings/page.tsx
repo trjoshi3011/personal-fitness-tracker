@@ -133,7 +133,7 @@ export default async function SettingsPage({
         sp.whoopSync ||
         sp.profile ||
         sp.password) && (
-        <div className="space-y-2 rounded-xl border border-amber-900/15 bg-card/80 p-4 text-sm text-stone-700">
+        <div className="space-y-2 rounded-xl border border-[color:var(--color-border-default)] bg-card/80 p-4 text-sm text-[color:var(--color-text-secondary)]">
           {sp.strava === "connected" ? (
             <p>Strava connected successfully.</p>
           ) : null}
@@ -144,19 +144,19 @@ export default async function SettingsPage({
             <p>WHOOP connected successfully.</p>
           ) : null}
           {sp.strava === "error" ? (
-            <p className="text-orange-900">
+            <p className="text-[color:var(--ui-danger)]">
               Strava connection failed
               {sp.reason ? `: ${sp.reason}` : ""}.
             </p>
           ) : null}
           {sp.fitbit === "error" ? (
-            <p className="text-orange-900">
+            <p className="text-[color:var(--ui-danger)]">
               Fitbit connection failed
               {sp.reason ? `: ${sp.reason}` : ""}.
             </p>
           ) : null}
           {sp.whoop === "error" ? (
-            <p className="text-orange-900">
+            <p className="text-[color:var(--ui-danger)]">
               WHOOP connection failed
               {sp.reason ? `: ${sp.reason}` : ""}.
             </p>
@@ -168,10 +168,10 @@ export default async function SettingsPage({
             </p>
           ) : null}
           {sp.stravaSync === "error" ? (
-            <p className="text-orange-900">Strava sync failed.</p>
+            <p className="text-[color:var(--ui-danger)]">Strava sync failed.</p>
           ) : null}
           {sp.stravaSync === "not_connected" ? (
-            <p className="text-orange-900">Connect Strava before syncing.</p>
+            <p className="text-[color:var(--ui-danger)]">Connect Strava before syncing.</p>
           ) : null}
           {sp.fitbitSync === "ok" ? (
             <p>
@@ -180,10 +180,10 @@ export default async function SettingsPage({
             </p>
           ) : null}
           {sp.fitbitSync === "error" ? (
-            <p className="text-orange-900">Fitbit sync failed.</p>
+            <p className="text-[color:var(--ui-danger)]">Fitbit sync failed.</p>
           ) : null}
           {sp.fitbitSync === "not_connected" ? (
-            <p className="text-orange-900">Connect Fitbit before syncing.</p>
+            <p className="text-[color:var(--ui-danger)]">Connect Fitbit before syncing.</p>
           ) : null}
           {sp.whoopSync === "ok" ? (
             <p>
@@ -196,22 +196,22 @@ export default async function SettingsPage({
             </p>
           ) : null}
           {sp.whoopSync === "error" ? (
-            <p className="text-orange-900">WHOOP sync failed.</p>
+            <p className="text-[color:var(--ui-danger)]">WHOOP sync failed.</p>
           ) : null}
           {sp.whoopSync === "not_connected" ? (
-            <p className="text-orange-900">Connect WHOOP before syncing.</p>
+            <p className="text-[color:var(--ui-danger)]">Connect WHOOP before syncing.</p>
           ) : null}
           {sp.profile === "ok" ? (
             <p>Profile updated successfully.</p>
           ) : null}
           {sp.profile === "error" ? (
-            <p className="text-orange-900">
+            <p className="text-[color:var(--ui-danger)]">
               Could not update profile
               {sp.reason ? `: ${sp.reason}` : ""}.
             </p>
           ) : null}
           {sp.password === "error" ? (
-            <p className="text-orange-900">
+            <p className="text-[color:var(--ui-danger)]">
               Could not change password
               {sp.reason ? `: ${sp.reason}` : ""}.
             </p>
@@ -242,13 +242,13 @@ export default async function SettingsPage({
             <div className="flex items-center gap-2">
               <Link
                 href="/api/strava/connect"
-                className="inline-flex h-9 items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800"
+                className="inline-flex h-9 items-center justify-center rounded-xl bg-[color:var(--ui-accent)] px-4 text-sm font-medium text-[color:var(--color-text-inverse)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--ui-accent)_88%,#000)]"
               >
                 {isConnected ? "Reconnect Strava" : "Connect Strava"}
               </Link>
               {isConnected ? (
                 <form action="/api/strava/sync?days=90" method="post">
-                  <button className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-900/15 bg-card/75 px-4 text-sm font-medium text-stone-700 transition-all hover:border-orange-500/40 hover:bg-orange-50/75 hover:text-orange-700">
+                  <button className="inline-flex h-9 items-center justify-center rounded-xl border border-[color:var(--color-border-default)] bg-card/75 px-4 text-sm font-medium text-[color:var(--color-text-secondary)] transition-all hover:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)]">
                     Sync now
                   </button>
                 </form>
@@ -263,7 +263,7 @@ export default async function SettingsPage({
                   ? formatZonedDateTimeMedium(strava.lastSyncedAt, tz)
                   : "never"}
               </div>
-              <div className="rounded-xl border border-amber-900/10 bg-card/55 p-4">
+              <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-card/55 p-4">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Recent activities (last 30 days)
                 </div>
@@ -292,7 +292,7 @@ export default async function SettingsPage({
             </div>
           ) : null}
 
-          <div className="border-t border-amber-900/10 pt-6">
+          <div className="border-t border-[color:var(--color-border-subtle)] pt-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="text-sm font-medium text-stone-900">Fitbit</div>

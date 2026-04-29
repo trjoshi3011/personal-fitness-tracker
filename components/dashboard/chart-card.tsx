@@ -29,7 +29,7 @@ export function ChartCard({
       </CardHeader>
       <CardContent className={cn("pt-0", contentClassName)}>
         {children ?? (
-          <div className="grid place-items-center rounded-xl border border-dashed border-yellow-800/15 bg-gradient-to-br from-yellow-100/30 via-amber-50/35 to-card/50 p-8 text-sm text-stone-500">
+          <div className="grid place-items-center rounded-xl border border-dashed border-[color:var(--color-border-subtle)] bg-[color:var(--ui-accent-soft)] p-8 text-sm text-[color:var(--color-text-tertiary)]">
             Chart placeholder
           </div>
         )}
