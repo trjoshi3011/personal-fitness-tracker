@@ -346,6 +346,14 @@
 [data-mode="dark"] .border-stone-200 { border-color: rgba(255, 255, 255, 0.10); }
 [data-mode="dark"] .border-stone-300 { border-color: rgba(255, 255, 255, 0.14); }
 
+/* In dark mode, brighten the run route basemap canvas a touch so the
+   tiles read as mid-grey rather than near-black. The route line is
+   rendered on the same canvas, but it stays vivid because the brightness
+   filter is gentle and the route color is already a bright accent. */
+[data-mode="dark"] .run-route-map .maplibregl-canvas {
+  filter: brightness(1.2) saturate(0.9);
+}
+
 /* MapLibre control buttons need contrast tweaks in dark mode */
 [data-mode="dark"] .maplibregl-ctrl-attrib {
   background: rgba(28, 27, 24, 0.8) !important;

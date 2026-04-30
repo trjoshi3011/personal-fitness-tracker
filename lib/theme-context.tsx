@@ -24,42 +24,53 @@ const ThemeContext = React.createContext<ThemeContextValue>({
 export const THEME_STORAGE_KEY = "fitnessDashboardTheme.v1";
 export const THEME_MODE_STORAGE_KEY = "fitnessDashboardThemeMode.v1";
 
+/**
+ * Use layoutEffect on the client so we can sync React state with the
+ * DOM attributes (set by the inline pre-hydration script) BEFORE the
+ * first paint. This avoids a brief window where the toggle button
+ * displays the wrong mode and the user could click it in the wrong
+ * direction.
+ */
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
+
+function readDomTheme(): ThemeId {
+  if (typeof document === "undefined") return "olive";
+  const v = document.documentElement.getAttribute("data-theme");
+  return v === "olive" || v === "lavender" || v === "terracotta" ? v : "olive";
+}
+
+function readDomMode(): ThemeMode {
+  if (typeof document === "undefined") return "light";
+  return document.documentElement.getAttribute("data-mode") === "dark"
+    ? "dark"
+    : "light";
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  // SSR initial value — gets corrected synchronously after hydration via
+  // the layout effect below, before paint.
   const [theme, setThemeRaw] = React.useState<ThemeId>("olive");
   const [mode, setModeRaw] = React.useState<ThemeMode>("light");
 
-  React.useEffect(() => {
+  // Sync React state with the DOM attributes that the inline pre-hydration
+  // script has already set from localStorage. Reading the DOM (instead of
+  // localStorage directly) guarantees state matches whatever is currently
+  // rendered, eliminating the toggle-direction bug.
+  useIsomorphicLayoutEffect(() => {
+    const domTheme = readDomTheme();
+    const domMode = readDomMode();
+    setThemeRaw(domTheme);
+    setModeRaw(domMode);
+    // Belt-and-suspenders: ensure localStorage has the active values too,
+    // in case this is a fresh visitor where the inline script defaulted.
     try {
-      const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
-      if (saved === "olive" || saved === "lavender" || saved === "terracotta") {
-        setThemeRaw(saved);
-      } else if (saved === "whoop" || saved === "amber") {
-        setThemeRaw("olive");
-      }
-    } catch {
-      /* ignore */
-    }
-    try {
-      const savedMode = window.localStorage.getItem(THEME_MODE_STORAGE_KEY);
-      if (savedMode === "light" || savedMode === "dark") {
-        setModeRaw(savedMode);
-      }
+      window.localStorage.setItem(THEME_STORAGE_KEY, domTheme);
+      window.localStorage.setItem(THEME_MODE_STORAGE_KEY, domMode);
     } catch {
       /* ignore */
     }
   }, []);
-
-  // Keep the DOM in sync with provider state so light/dark persists reliably
-  // across reloads and matches the user's last selection.
-  React.useEffect(() => {
-    try {
-      document.documentElement.setAttribute("data-theme", theme);
-      document.documentElement.setAttribute("data-mode", mode);
-      document.documentElement.classList.toggle("dark", mode === "dark");
-    } catch {
-      /* ignore */
-    }
-  }, [theme, mode]);
 
   const setTheme = React.useCallback((t: ThemeId) => {
     setThemeRaw(t);
@@ -76,7 +87,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     try {
       document.documentElement.setAttribute("data-mode", m);
       // Tailwind v4 dark variant uses .dark on the html/body when configured.
-      // Toggle the class so any `dark:` utilities also pick it up.
       document.documentElement.classList.toggle("dark", m === "dark");
       window.localStorage.setItem(THEME_MODE_STORAGE_KEY, m);
     } catch {
@@ -84,9 +94,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Read mode from DOM at click-time so the toggle direction is always
+  // correct, even if React state hasn't caught up yet (e.g., very first
+  // render after hydration).
   const toggleMode = React.useCallback(() => {
-    setMode(mode === "dark" ? "light" : "dark");
-  }, [mode, setMode]);
+    const current = readDomMode();
+    setMode(current === "dark" ? "light" : "dark");
+  }, [setMode]);
 
   return (
     <ThemeContext.Provider

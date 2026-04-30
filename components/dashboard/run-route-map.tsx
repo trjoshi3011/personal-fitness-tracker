@@ -12,17 +12,14 @@ type Props = {
 
 type ThemeMode = "light" | "dark";
 
-const ROUTE_SOURCE_ID = "lockin-run-route";
-const ROUTE_LAYER_GLOW_ID = "lockin-run-route-glow";
-const ROUTE_LAYER_LINE_ID = "lockin-run-route-line";
-
 /* --- basemap styles -----------------------------------------------------
    Primary: MapTiler vector tile maps via MapLibre GL JS.
    Reference: https://docs.maptiler.com/maplibre/
               https://maplibre.org/maplibre-gl-js/docs/
 
-   We use the `dataviz` style family because it's purpose-built to be a
-   subtle background for data overlays (perfect for an Strava run line).
+   Light: `dataviz-light` — clean, neutral, optimized for data overlays.
+   Dark : `streets-v2-dark` — a softer charcoal grey (lighter than
+          `dataviz-dark`) so the route + UI stay readable.
    Falls back to a Carto raster basemap if NEXT_PUBLIC_MAPTILER_API_KEY
    is not configured so the feature still works out of the box.        */
 
@@ -31,8 +28,7 @@ const MAPTILER_KEY =
 
 function buildBasemapStyle(mode: ThemeMode): string | StyleSpecification {
   if (MAPTILER_KEY) {
-    const styleId = mode === "dark" ? "dataviz-dark" : "dataviz-light";
-    // MapLibre will load the JSON style from MapTiler directly.
+    const styleId = mode === "dark" ? "streets-v2-dark" : "dataviz-light";
     return `https://api.maptiler.com/maps/${styleId}/style.json?key=${MAPTILER_KEY}`;
   }
 
@@ -43,9 +39,10 @@ function buildBasemapStyle(mode: ThemeMode): string | StyleSpecification {
     "https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
   ];
   const darkTiles = [
-    "https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
-    "https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
-    "https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
+    // Carto's `dark_nolabels` is a touch lighter than `dark_all`.
+    "https://a.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}.png",
+    "https://b.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}.png",
+    "https://c.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}.png",
   ];
   const tiles = mode === "dark" ? darkTiles : lightTiles;
   return {
@@ -80,23 +77,76 @@ function readAccent(): string {
   return v || "#dc2626";
 }
 
+type RouteFC = {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    geometry: { type: "LineString"; coordinates: [number, number][] };
+    properties: Record<string, unknown>;
+  }>;
+};
+
+/**
+ * Idempotent installer that adds the route source + glow + line layers,
+ * or updates them if they already exist. Always uses the latest geojson
+ * and accent color from the closures' refs.
+ */
+function installRouteLayers(map: MlMap, geojson: RouteFC, accent: string) {
+  const src = map.getSource("route") as maplibregl.GeoJSONSource | undefined;
+  if (!src) {
+    map.addSource("route", { type: "geojson", data: geojson });
+  } else {
+    src.setData(geojson);
+  }
+  if (!map.getLayer("route-glow")) {
+    map.addLayer({
+      id: "route-glow",
+      type: "line",
+      source: "route",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": accent,
+        "line-width": 8,
+        "line-opacity": 0.18,
+        "line-blur": 6,
+      },
+    });
+  } else {
+    map.setPaintProperty("route-glow", "line-color", accent);
+  }
+  if (!map.getLayer("route-line")) {
+    map.addLayer({
+      id: "route-line",
+      type: "line",
+      source: "route",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": accent,
+        "line-width": 4,
+        "line-opacity": 0.95,
+      },
+    });
+  } else {
+    map.setPaintProperty("route-line", "line-color", accent);
+  }
+}
+
 export default function RunRouteMap({ polyline }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
-  // Initialize synchronously — this component is dynamically imported with
-  // ssr: false, so document is available on first render.
+  // Read the initial mode synchronously — the component is dynamic({ ssr: false })
   const [mode, setMode] = useState<ThemeMode>(() => readMode());
 
   const points = useMemo(() => decodePolyline(polyline), [polyline]);
   const bounds = useMemo(() => getRouteBounds(points), [points]);
-  const geojson = useMemo(
+  const geojson = useMemo<RouteFC>(
     () => ({
-      type: "FeatureCollection" as const,
+      type: "FeatureCollection",
       features: [
         {
-          type: "Feature" as const,
+          type: "Feature",
           geometry: {
-            type: "LineString" as const,
+            type: "LineString",
             coordinates: points.map(
               ([lat, lng]) => [lng, lat] as [number, number],
             ),
@@ -108,10 +158,21 @@ export default function RunRouteMap({ polyline }: Props) {
     [points],
   );
 
-  const startMarkerRef = useRef<maplibregl.Marker | null>(null);
-  const endMarkerRef = useRef<maplibregl.Marker | null>(null);
+  // Refs that always hold the latest values. Used by event handlers that
+  // were registered once during the initial map setup.
+  const geojsonRef = useRef(geojson);
+  useEffect(() => {
+    geojsonRef.current = geojson;
+    // If the map is already live and the route data changed, push the new
+    // data to the existing source.
+    const map = mapRef.current;
+    if (map && map.getSource("route")) {
+      const src = map.getSource("route") as maplibregl.GeoJSONSource;
+      src.setData(geojson);
+    }
+  }, [geojson]);
 
-  // Observe theme changes from the rest of the app.
+  // Watch theme changes from the rest of the app.
   useEffect(() => {
     const obs = new MutationObserver(() => setMode(readMode()));
     obs.observe(document.documentElement, {
@@ -121,8 +182,7 @@ export default function RunRouteMap({ polyline }: Props) {
     return () => obs.disconnect();
   }, []);
 
-  // Single effect to install / dispose the map. Uses the current `mode`
-  // for the *initial* style only.
+  // Single effect to create / dispose the map.
   useEffect(() => {
     if (!containerRef.current || points.length < 2 || !bounds) return;
     if (mapRef.current) return;
@@ -143,52 +203,8 @@ export default function RunRouteMap({ polyline }: Props) {
     );
     mapRef.current = map;
 
-    const installRouteLayers = () => {
-      const accent = readAccent();
-      if (!map.getSource(ROUTE_SOURCE_ID)) {
-        map.addSource(ROUTE_SOURCE_ID, { type: "geojson", data: geojson });
-      } else {
-        const src = map.getSource(ROUTE_SOURCE_ID);
-        // Update geojson data on style swaps to be safe.
-        if (src && "setData" in src) {
-          (src as maplibregl.GeoJSONSource).setData(geojson);
-        }
-      }
-      if (!map.getLayer(ROUTE_LAYER_GLOW_ID)) {
-        map.addLayer({
-          id: ROUTE_LAYER_GLOW_ID,
-          type: "line",
-          source: ROUTE_SOURCE_ID,
-          layout: { "line-cap": "round", "line-join": "round" },
-          paint: {
-            "line-color": accent,
-            "line-width": 8,
-            "line-opacity": 0.18,
-            "line-blur": 6,
-          },
-        });
-      } else {
-        map.setPaintProperty(ROUTE_LAYER_GLOW_ID, "line-color", accent);
-      }
-      if (!map.getLayer(ROUTE_LAYER_LINE_ID)) {
-        map.addLayer({
-          id: ROUTE_LAYER_LINE_ID,
-          type: "line",
-          source: ROUTE_SOURCE_ID,
-          layout: { "line-cap": "round", "line-join": "round" },
-          paint: {
-            "line-color": accent,
-            "line-width": 4,
-            "line-opacity": 0.95,
-          },
-        });
-      } else {
-        map.setPaintProperty(ROUTE_LAYER_LINE_ID, "line-color", accent);
-      }
-    };
-
     map.on("load", () => {
-      installRouteLayers();
+      installRouteLayers(map, geojsonRef.current, readAccent());
 
       const startLng = points[0][1];
       const startLat = points[0][0];
@@ -198,7 +214,7 @@ export default function RunRouteMap({ polyline }: Props) {
       const startEl = document.createElement("div");
       startEl.style.cssText =
         "width:14px;height:14px;border-radius:9999px;background:#16a34a;border:2px solid white;box-shadow:0 0 0 1px rgba(0,0,0,0.15)";
-      startMarkerRef.current = new maplibregl.Marker({ element: startEl })
+      new maplibregl.Marker({ element: startEl })
         .setLngLat([startLng, startLat])
         .setPopup(
           new maplibregl.Popup({ offset: 12, closeButton: false }).setText("Start"),
@@ -208,7 +224,7 @@ export default function RunRouteMap({ polyline }: Props) {
       const endEl = document.createElement("div");
       endEl.style.cssText =
         "width:14px;height:14px;border-radius:9999px;background:#dc2626;border:2px solid white;box-shadow:0 0 0 1px rgba(0,0,0,0.15)";
-      endMarkerRef.current = new maplibregl.Marker({ element: endEl })
+      new maplibregl.Marker({ element: endEl })
         .setLngLat([endLng, endLat])
         .setPopup(
           new maplibregl.Popup({ offset: 12, closeButton: false }).setText("End"),
@@ -224,29 +240,21 @@ export default function RunRouteMap({ polyline }: Props) {
       );
     });
 
-    // After every style swap (mode change), reinstall the route layer.
-    map.on("style.load", () => {
-      // Skip the very first style.load — the "load" handler above already ran.
-      if (!map.loaded()) return;
-      installRouteLayers();
-    });
-
     const ro = new ResizeObserver(() => map.resize());
     ro.observe(containerRef.current);
 
     return () => {
       ro.disconnect();
-      startMarkerRef.current = null;
-      endMarkerRef.current = null;
       map.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Swap basemap when mode changes — only when the new mode differs from
-  // what the map is currently displaying. The "style.load" handler above
-  // re-installs the route layer once the new style finishes loading.
+  // Swap basemap when mode changes, then re-install the route on the new
+  // style. We use `once("style.load")` per swap so we never miss the event
+  // and the layers are always re-added — fixes the "route disappears when
+  // toggling dark/light" bug.
   const lastModeRef = useRef<ThemeMode | null>(null);
   useEffect(() => {
     const map = mapRef.current;
@@ -260,74 +268,17 @@ export default function RunRouteMap({ polyline }: Props) {
     }
     if (lastModeRef.current === mode) return;
     lastModeRef.current = mode;
+
+    const reinstall = () => {
+      installRouteLayers(map, geojsonRef.current, readAccent());
+    };
+    map.once("style.load", reinstall);
+    // Safety net: in some MapLibre versions `style.load` doesn't fire if
+    // the diff path was used. `idle` always fires once the map settles.
+    map.once("idle", reinstall);
+
     map.setStyle(buildBasemapStyle(mode));
   }, [mode]);
-
-  // If the polyline changes or the route layers get dropped for any reason,
-  // update (or re-install) the route overlay so the line doesn't disappear.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || points.length < 2 || !bounds) return;
-    if (!map.isStyleLoaded()) return;
-
-    const accent = readAccent();
-
-    if (!map.getSource(ROUTE_SOURCE_ID)) {
-      map.addSource(ROUTE_SOURCE_ID, { type: "geojson", data: geojson });
-    } else {
-      const src = map.getSource(ROUTE_SOURCE_ID);
-      if (src && "setData" in src) {
-        (src as maplibregl.GeoJSONSource).setData(geojson);
-      }
-    }
-
-    if (!map.getLayer(ROUTE_LAYER_GLOW_ID)) {
-      map.addLayer({
-        id: ROUTE_LAYER_GLOW_ID,
-        type: "line",
-        source: ROUTE_SOURCE_ID,
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: {
-          "line-color": accent,
-          "line-width": 8,
-          "line-opacity": 0.18,
-          "line-blur": 6,
-        },
-      });
-    } else {
-      map.setPaintProperty(ROUTE_LAYER_GLOW_ID, "line-color", accent);
-    }
-    if (!map.getLayer(ROUTE_LAYER_LINE_ID)) {
-      map.addLayer({
-        id: ROUTE_LAYER_LINE_ID,
-        type: "line",
-        source: ROUTE_SOURCE_ID,
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: {
-          "line-color": accent,
-          "line-width": 4,
-          "line-opacity": 0.95,
-        },
-      });
-    } else {
-      map.setPaintProperty(ROUTE_LAYER_LINE_ID, "line-color", accent);
-    }
-
-    const startLng = points[0][1];
-    const startLat = points[0][0];
-    const endLng = points[points.length - 1][1];
-    const endLat = points[points.length - 1][0];
-    startMarkerRef.current?.setLngLat([startLng, startLat]);
-    endMarkerRef.current?.setLngLat([endLng, endLat]);
-
-    map.fitBounds(
-      [
-        [bounds.minLng, bounds.minLat],
-        [bounds.maxLng, bounds.maxLat],
-      ],
-      { padding: 28, duration: 0 },
-    );
-  }, [geojson, bounds, points]);
 
   if (points.length < 2 || !bounds) {
     return (
@@ -347,7 +298,7 @@ export default function RunRouteMap({ polyline }: Props) {
       </div>
       <div
         ref={containerRef}
-        className="h-[320px] w-full overflow-hidden rounded-xl border border-[color:var(--color-border-subtle)]"
+        className="run-route-map h-[320px] w-full overflow-hidden rounded-xl border border-[color:var(--color-border-subtle)]"
       />
     </div>
   );
