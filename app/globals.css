@@ -8,9 +8,9 @@
   --radius: 16px;
 
   /* Theme-driven tokens (overridden per theme below) */
-  --background: #f7f5f0;
-  --card: rgba(255, 255, 255, 0.78);
-  --muted: rgba(240, 237, 230, 0.9);
+  --background: #ece6d7; /* warmer beige base */
+  --card: rgba(252, 247, 235, 0.82); /* slightly warm cream card */
+  --muted: rgba(232, 224, 207, 0.9);
   --border: rgba(30, 28, 24, 0.10);
   --ring: rgba(107, 122, 62, 0.28);
   --accent: #6b7a3e;
@@ -22,9 +22,9 @@
   --color-brand-tertiary: #c4856a;
 
   --color-bg-base: var(--background);
-  --color-bg-surface: #ffffff;
-  --color-bg-elevated: #f0ede6;
-  --color-bg-inset: #e8e4db;
+  --color-bg-surface: #faf4e6; /* cream surface, not pure white */
+  --color-bg-elevated: #ece4d0;
+  --color-bg-inset: #e2d9c2;
   --color-border-subtle: rgba(30, 28, 24, 0.10);
   --color-border-default: rgba(30, 28, 24, 0.14);
   --color-border-strong: rgba(30, 28, 24, 0.22);
@@ -85,9 +85,9 @@
   --color-chart-axis: var(--chart-axis-text);
 }
 
-/* Three light themes: Olive / Lavender / Terracotta */
+/* Three light themes: Olive / Lavender / Terracotta — warm beige bases */
 [data-theme="olive"] {
-  --background: #f4f5ee;
+  --background: #ebe7d2; /* warm olive-tinted beige */
   --accent: #6b7a3e;
   --ring: rgba(107, 122, 62, 0.30);
   --border: rgba(30, 28, 24, 0.10);
@@ -119,7 +119,7 @@
 }
 
 [data-theme="lavender"] {
-  --background: #f4f2fb;
+  --background: #eae4dc; /* warm beige with a soft cool undertone */
   --accent: #9b8ec4;
   --ring: rgba(155, 142, 196, 0.28);
   --border: rgba(30, 28, 24, 0.10);
@@ -151,7 +151,7 @@
 }
 
 [data-theme="terracotta"] {
-  --background: #fbf2ee;
+  --background: #efdfd0; /* sandy terracotta beige */
   --accent: #c4856a;
   --ring: rgba(196, 133, 106, 0.28);
   --border: rgba(30, 28, 24, 0.10);
@@ -180,6 +180,187 @@
   --color-chart-5: var(--chart-pace);
   --color-chart-6: var(--chart-body);
   --color-chart-grid: rgba(196, 133, 106, 0.14);
+}
+
+/* ─── Dark mode ───────────────────────────────────────────────────
+   All three base color themes get a dark grey variant. The brand
+   colors are slightly brightened so they retain pop on dark grey.   */
+
+[data-mode="dark"] {
+  --foreground: #f3f1ea;
+  --card-foreground: #f3f1ea;
+  --muted-foreground: #b3ada1;
+
+  /* Medium-grey base — softer than near-black, easier on the eyes. */
+  --background: #2c2b29;
+  --card: rgba(54, 52, 49, 0.78);
+  --muted: rgba(60, 58, 54, 0.9);
+  --border: rgba(255, 255, 255, 0.10);
+
+  --color-bg-base: var(--background);
+  --color-bg-surface: #36342f; /* card surface */
+  --color-bg-elevated: #3f3d38;
+  --color-bg-inset: #46443f;
+  --color-border-subtle: rgba(255, 255, 255, 0.09);
+  --color-border-default: rgba(255, 255, 255, 0.14);
+  --color-border-strong: rgba(255, 255, 255, 0.22);
+
+  --color-text-primary: var(--foreground);
+  --color-text-secondary: #d8d4c8;
+  --color-text-tertiary: var(--muted-foreground);
+  --color-text-inverse: #1c1b18;
+
+  --chart-grid: rgba(255, 255, 255, 0.12);
+  --chart-tooltip-bg: rgba(54, 52, 49, 0.94);
+  --chart-tooltip-border: rgba(255, 255, 255, 0.14);
+  --chart-tooltip-text: #f3f1ea;
+  --chart-axis-text: #b3ada1;
+  --color-chart-grid: rgba(255, 255, 255, 0.12);
+  --color-chart-axis: var(--chart-axis-text);
+}
+
+/* Dark + olive */
+[data-mode="dark"][data-theme="olive"] {
+  --background: #2c2d28; /* mid grey with a hint of olive */
+  --accent: #a8b96b;
+  --ring: rgba(168, 185, 107, 0.36);
+
+  --color-brand-primary: #a8b96b;
+  --color-brand-secondary: #b9aef0;
+  --color-brand-tertiary: #e29c80;
+
+  --chart-volume: #a8b96b;
+  --chart-intensity: #e29c80;
+  --chart-recovery: #6cd3ee;
+  --chart-pace: #f4cf6b;
+  --chart-body: #f5a4ce;
+  --chart-grid: rgba(168, 185, 107, 0.18);
+
+  --color-chart-1: var(--chart-volume);
+  --color-chart-2: #b9aef0;
+  --color-chart-3: var(--chart-intensity);
+  --color-chart-4: var(--chart-recovery);
+  --color-chart-5: var(--chart-pace);
+  --color-chart-6: var(--chart-body);
+  --color-chart-grid: rgba(168, 185, 107, 0.18);
+}
+
+/* Dark + lavender */
+[data-mode="dark"][data-theme="lavender"] {
+  --background: #2c2b2f; /* mid grey with a hint of lavender */
+  --accent: #b8aae8;
+  --ring: rgba(184, 170, 232, 0.36);
+
+  --color-brand-primary: #b8aae8;
+  --color-brand-secondary: #a8b96b;
+  --color-brand-tertiary: #e29c80;
+
+  --chart-volume: #b8aae8;
+  --chart-intensity: #e29c80;
+  --chart-recovery: #5cdcd2;
+  --chart-pace: #f4cf6b;
+  --chart-body: #f5a4ce;
+  --chart-grid: rgba(184, 170, 232, 0.18);
+
+  --color-chart-1: var(--chart-volume);
+  --color-chart-2: #b8aae8;
+  --color-chart-3: var(--chart-intensity);
+  --color-chart-4: var(--chart-recovery);
+  --color-chart-5: var(--chart-pace);
+  --color-chart-6: var(--chart-body);
+  --color-chart-grid: rgba(184, 170, 232, 0.18);
+}
+
+/* Dark + terracotta */
+[data-mode="dark"][data-theme="terracotta"] {
+  --background: #2f2b29; /* mid grey with a hint of terracotta */
+  --accent: #e29c80;
+  --ring: rgba(226, 156, 128, 0.36);
+
+  --color-brand-primary: #e29c80;
+  --color-brand-secondary: #b8aae8;
+  --color-brand-tertiary: #a8b96b;
+
+  --chart-volume: #e29c80;
+  --chart-intensity: #b8aae8;
+  --chart-recovery: #6cd3ee;
+  --chart-pace: #f4cf6b;
+  --chart-body: #f5a4ce;
+  --chart-grid: rgba(226, 156, 128, 0.18);
+
+  --color-chart-1: var(--chart-volume);
+  --color-chart-2: #b8aae8;
+  --color-chart-3: var(--chart-intensity);
+  --color-chart-4: var(--chart-recovery);
+  --color-chart-5: var(--chart-pace);
+  --color-chart-6: var(--chart-body);
+  --color-chart-grid: rgba(226, 156, 128, 0.18);
+}
+
+/* Recompute UI accent tokens once dark variables are in place. */
+[data-mode="dark"] {
+  --ui-accent: var(--color-brand-primary);
+  --ui-accent-2: var(--color-brand-secondary);
+  --ui-accent-3: var(--color-brand-tertiary);
+  --ui-accent-soft: color-mix(in srgb, var(--ui-accent) 16%, transparent);
+  --ui-accent-2-soft: color-mix(in srgb, var(--ui-accent-2) 16%, transparent);
+  --ui-accent-3-soft: color-mix(in srgb, var(--ui-accent-3) 16%, transparent);
+  --ui-success: color-mix(in srgb, var(--ui-accent) 70%, #4ade80);
+  --ui-warning: color-mix(in srgb, var(--ui-accent-3) 60%, #facc15);
+  --ui-danger: color-mix(in srgb, var(--ui-accent-3) 60%, #f87171);
+  --ui-success-soft: color-mix(in srgb, var(--ui-success) 22%, transparent);
+  --ui-warning-soft: color-mix(in srgb, var(--ui-warning) 22%, transparent);
+  --ui-danger-soft: color-mix(in srgb, var(--ui-danger) 22%, transparent);
+}
+
+/* Slightly more saturated dashboard aura on dark grey. */
+[data-mode="dark"] .dashboard-bg {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(ellipse 120% 85% at 50% -12%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%),
+    radial-gradient(900px 640px at 8% 18%, color-mix(in srgb, var(--chart-recovery) 14%, transparent), transparent 55%),
+    radial-gradient(900px 640px at 94% 14%, color-mix(in srgb, var(--chart-body) 12%, transparent), transparent 55%),
+    radial-gradient(760px 520px at 50% 62%, color-mix(in srgb, var(--chart-pace) 8%, transparent), transparent 65%);
+}
+
+[data-mode="dark"] .dashboard-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--accent) 12%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--accent) 12%, transparent) 1px, transparent 1px);
+}
+
+/* Dark-mode remapping of common Tailwind stone-* utilities so existing
+   components render with correct contrast on dark grey backgrounds. */
+[data-mode="dark"] .text-stone-900 { color: #f1efe8; }
+[data-mode="dark"] .text-stone-800 { color: #ebe8de; }
+[data-mode="dark"] .text-stone-700 { color: #d3cfc4; }
+[data-mode="dark"] .text-stone-600 { color: #b6b0a4; }
+[data-mode="dark"] .text-stone-500 { color: #948c80; }
+[data-mode="dark"] .text-stone-400 { color: #756d62; }
+[data-mode="dark"] .text-stone-300 { color: #5c554c; }
+
+[data-mode="dark"] .bg-stone-100 { background-color: rgba(255, 255, 255, 0.05); }
+[data-mode="dark"] .bg-stone-200\/60 { background-color: rgba(255, 255, 255, 0.08); }
+[data-mode="dark"] .bg-stone-200 { background-color: rgba(255, 255, 255, 0.10); }
+
+[data-mode="dark"] .border-stone-200 { border-color: rgba(255, 255, 255, 0.10); }
+[data-mode="dark"] .border-stone-300 { border-color: rgba(255, 255, 255, 0.14); }
+
+/* MapLibre control buttons need contrast tweaks in dark mode */
+[data-mode="dark"] .maplibregl-ctrl-attrib {
+  background: rgba(28, 27, 24, 0.8) !important;
+  color: #d3cfc4 !important;
+}
+[data-mode="dark"] .maplibregl-ctrl-attrib a { color: #d3cfc4 !important; }
+[data-mode="dark"] .maplibregl-ctrl button {
+  background-color: rgba(28, 27, 24, 0.85) !important;
+}
+[data-mode="dark"] .maplibregl-ctrl button:hover {
+  background-color: rgba(28, 27, 24, 0.95) !important;
+}
+[data-mode="dark"] .maplibregl-ctrl-group {
+  background: rgba(28, 27, 24, 0.85) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
 }
 
 @theme inline {

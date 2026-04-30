@@ -371,8 +371,8 @@ export default async function RunningPage({
                       <span
                         className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
                         style={{
-                          backgroundColor: `color-mix(in srgb, ${t.color} 18%, transparent)`,
-                          color: `color-mix(in srgb, ${t.color} 65%, #1e1c18)`,
+                          backgroundColor: `color-mix(in srgb, ${t.color} 22%, transparent)`,
+                          color: `color-mix(in srgb, ${t.color} 65%, var(--foreground))`,
                         }}
                       >
                         <span

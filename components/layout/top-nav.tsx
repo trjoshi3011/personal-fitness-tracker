@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, Palette } from "lucide-react";
+import { Menu, Moon, Palette, Sun } from "lucide-react";
 import * as React from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -40,7 +40,7 @@ const SCROLL_DELTA_PX = 6;
 export function TopNav() {
   const logoutFormRef = React.useRef<HTMLFormElement | null>(null);
   const lastScrollY = React.useRef(0);
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, mode, toggleMode } = useTheme();
   /** Until true, keep profile visible so SSR + first client paint match (avoids hydration errors). */
   const [scrollReady, setScrollReady] = React.useState(false);
   const [showProfile, setShowProfile] = React.useState(true);
@@ -109,6 +109,23 @@ export function TopNav() {
                 {theme === t.id ? <span className="text-xs text-stone-400">Selected</span> : null}
               </DropdownMenuItem>
             ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                toggleMode();
+              }}
+              className="flex items-center gap-2"
+            >
+              {mode === "dark" ? (
+                <Sun className="h-3.5 w-3.5" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
+              <span className="flex-1">
+                {mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              </span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -123,6 +140,24 @@ export function TopNav() {
         aria-hidden={!profileVisible}
         suppressHydrationWarning
       >
+        <button
+          type="button"
+          onClick={toggleMode}
+          tabIndex={profileVisible ? 0 : -1}
+          className="flex items-center gap-1.5 rounded-xl px-2 py-1.5 outline-none transition-colors hover:bg-[color:var(--ui-accent-soft)] focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          aria-label={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {mode === "dark" ? (
+            <Sun className="h-4 w-4 text-stone-300" />
+          ) : (
+            <Moon className="h-4 w-4 text-stone-600" />
+          )}
+          <span className="hidden text-xs font-medium text-stone-700 md:inline">
+            {mode === "dark" ? "Dark" : "Light"}
+          </span>
+        </button>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

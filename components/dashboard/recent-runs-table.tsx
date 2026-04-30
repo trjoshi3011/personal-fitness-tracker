@@ -97,8 +97,8 @@ function RunTagBadge({ tag, size = "sm" }: { tag: RunTag; size?: "xs" | "sm" }) 
     <span
       className={`inline-flex items-center gap-1 rounded-full font-semibold tracking-wide uppercase ${padding}`}
       style={{
-        backgroundColor: `color-mix(in srgb, ${tag.color} 18%, transparent)`,
-        color: `color-mix(in srgb, ${tag.color} 65%, #1e1c18)`,
+        backgroundColor: `color-mix(in srgb, ${tag.color} 22%, transparent)`,
+        color: `color-mix(in srgb, ${tag.color} 65%, var(--foreground))`,
       }}
       title={tag.description}
     >
