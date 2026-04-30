@@ -33,6 +33,11 @@ import { formatZonedDateShort } from "@/lib/format-zoned";
 import { normalizeUserTimezone } from "@/lib/user-timezone";
 import { classifyRun, computeRunTrainingProfile } from "@/lib/run-tag";
 import { getTagDefinition, type RunTagId } from "@/lib/run-tag";
+import {
+  buildExertionProfile,
+  computeRunExertion,
+  computeRawExertion,
+} from "@/lib/run-metrics";
 
 export const dynamic = "force-dynamic";
 
@@ -127,6 +132,20 @@ export default async function RunningPage({
     hrPcts: hrPctsProfile,
   });
 
+  // Exertion profile (normalize exertion scores to your recent training).
+  const rawExertions = profileRuns
+    .map((r) =>
+      computeRawExertion({
+        distanceMeters: r.distanceMeters,
+        movingTimeSec: r.movingTimeSec,
+        averageHrBpm: r.averageHrBpm,
+        userReferenceMaxHr: userReferenceMaxHr ?? null,
+      }),
+    )
+    .filter((x): x is number => typeof x === "number" && Number.isFinite(x));
+  const exertionProfile = buildExertionProfile(rawExertions);
+
+
   const activeRunDays = activeZonedDaysOfMonth(runStartsMonth, tz, cal.year, cal.month1);
 
   const runCount = runs7.length;
@@ -150,6 +169,7 @@ export default async function RunningPage({
     wHrv.length > 0
       ? wHrv.reduce((a, r) => a + (r.hrvRmssdMs ?? 0), 0) / wHrv.length
       : null;
+
 
   const whoopRecStrainChart = whoop30
     .filter((r) => r.recoveryScore != null || r.strain != null)
@@ -368,7 +388,7 @@ export default async function RunningPage({
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
-                    Classification key
+                    Keys
                   </span>
                   <span className="rounded-full bg-[color:var(--ui-accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-stone-600">
                     {userReferenceMaxHr
@@ -382,60 +402,164 @@ export default async function RunningPage({
                 <span className="text-[10px] text-stone-500">Show</span>
               </div>
             </summary>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {(
-                [
-                  "easy",
-                  "recovery",
-                  "tempo",
-                  "threshold",
-                  "intervals",
-                  "race",
-                  "long",
-                  "unclassified",
-                ] satisfies RunTagId[]
-              ).map((id) => {
-                const t = getTagDefinition(id);
-                const desc =
-                  id === "long" && trainingProfile.longRunMiles
-                    ? `Long-distance aerobic run (≥${trainingProfile.longRunMiles.toFixed(1)} mi).`
-                    : id === "recovery" && trainingProfile.recoveryMaxHrPct
-                      ? `Short, low-HR shakeout (≤${trainingProfile.recoveryMaxHrPct.toFixed(0)}% max HR).`
-                      : id === "easy" && trainingProfile.tempoMinHrPct && trainingProfile.recoveryMaxHrPct
-                        ? `Conversational aerobic effort (${Math.round(trainingProfile.recoveryMaxHrPct + 1)}–${Math.round(trainingProfile.tempoMinHrPct - 1)}% max HR).`
-                        : id === "tempo" && trainingProfile.tempoMinHrPct && trainingProfile.thresholdMinHrPct
-                          ? `Comfortably hard aerobic effort (≥${trainingProfile.tempoMinHrPct.toFixed(0)}%, <${trainingProfile.thresholdMinHrPct.toFixed(0)}% max HR).`
-                          : id === "threshold" && trainingProfile.thresholdMinHrPct && trainingProfile.intervalsMinHrPct
-                            ? `Sustained effort near threshold (≥${trainingProfile.thresholdMinHrPct.toFixed(0)}%, <${trainingProfile.intervalsMinHrPct.toFixed(0)}% max HR).`
-                            : id === "intervals" && trainingProfile.intervalsMinHrPct
-                              ? `Short hard workout (≥${trainingProfile.intervalsMinHrPct.toFixed(0)}% max HR).`
-                              : id === "race" && trainingProfile.raceMinHrPct
-                                ? `All-out effort (≥${trainingProfile.raceMinHrPct.toFixed(0)}% max HR).`
-                                : t.description;
-                return (
-                  <div
-                    key={id}
-                    className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-2 backdrop-blur-sm transition-colors hover:bg-[color:var(--ui-accent-soft)]/50"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
-                        style={{
-                          backgroundColor: `color-mix(in srgb, ${t.color} 22%, transparent)`,
-                          color: `color-mix(in srgb, ${t.color} 65%, var(--foreground))`,
-                        }}
+            <div className="mt-3 grid gap-4 lg:grid-cols-2">
+              <div>
+                <div className="mb-2 text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+                  Classification key
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {(
+                    [
+                      "easy",
+                      "recovery",
+                      "tempo",
+                      "threshold",
+                      "intervals",
+                      "race",
+                      "long",
+                      "unclassified",
+                    ] satisfies RunTagId[]
+                  ).map((id) => {
+                    const t = getTagDefinition(id);
+                    const desc =
+                      id === "long" && trainingProfile.longRunMiles
+                        ? `Long-distance aerobic run (≥${trainingProfile.longRunMiles.toFixed(1)} mi).`
+                        : id === "recovery" && trainingProfile.recoveryMaxHrPct
+                          ? `Short, low-HR shakeout (≤${trainingProfile.recoveryMaxHrPct.toFixed(0)}% max HR).`
+                          : id === "easy" && trainingProfile.tempoMinHrPct && trainingProfile.recoveryMaxHrPct
+                            ? `Conversational aerobic effort (${Math.round(trainingProfile.recoveryMaxHrPct + 1)}–${Math.round(trainingProfile.tempoMinHrPct - 1)}% max HR).`
+                            : id === "tempo" && trainingProfile.tempoMinHrPct && trainingProfile.thresholdMinHrPct
+                              ? `Comfortably hard aerobic effort (≥${trainingProfile.tempoMinHrPct.toFixed(0)}%, <${trainingProfile.thresholdMinHrPct.toFixed(0)}% max HR).`
+                              : id === "threshold" && trainingProfile.thresholdMinHrPct && trainingProfile.intervalsMinHrPct
+                                ? `Sustained effort near threshold (≥${trainingProfile.thresholdMinHrPct.toFixed(0)}%, <${trainingProfile.intervalsMinHrPct.toFixed(0)}% max HR).`
+                                : id === "intervals" && trainingProfile.intervalsMinHrPct
+                                  ? `Short hard workout (≥${trainingProfile.intervalsMinHrPct.toFixed(0)}% max HR).`
+                                  : id === "race" && trainingProfile.raceMinHrPct
+                                    ? `All-out effort (≥${trainingProfile.raceMinHrPct.toFixed(0)}% max HR).`
+                                    : t.description;
+                    return (
+                      <div
+                        key={id}
+                        className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-2 backdrop-blur-sm transition-colors hover:bg-[color:var(--ui-accent-soft)]/50"
                       >
-                        <span
-                          className="inline-block h-1.5 w-1.5 rounded-full"
-                          style={{ backgroundColor: t.color }}
-                        />
-                        {t.label}
-                      </span>
-                      <span className="text-[11px] text-stone-500">{desc}</span>
-                    </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                            style={{
+                              backgroundColor: `color-mix(in srgb, ${t.color} 22%, transparent)`,
+                              color: `color-mix(in srgb, ${t.color} 65%, var(--foreground))`,
+                            }}
+                          >
+                            <span
+                              className="inline-block h-1.5 w-1.5 rounded-full"
+                              style={{ backgroundColor: t.color }}
+                            />
+                            {t.label}
+                          </span>
+                          <span className="text-[11px] text-stone-500">{desc}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+                    Effort key
                   </div>
-                );
-              })}
+                  <span className="text-[10px] text-stone-500">
+                    Exertion score (0–10) from HR intensity + duration
+                  </span>
+                </div>
+
+                <div className="grid gap-2">
+                  {exertionProfile ? (
+                    <>
+                      <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                            style={{
+                              backgroundColor: "color-mix(in srgb, #22c55e 22%, transparent)",
+                              color: "color-mix(in srgb, #22c55e 70%, var(--foreground))",
+                            }}
+                          >
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#22c55e]" />
+                            Moderate
+                          </span>
+                          <span className="text-[11px] text-stone-500">
+                            ≤ typical (≤P50 of your recent exertion)
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                            style={{
+                              backgroundColor: "color-mix(in srgb, #f59e0b 22%, transparent)",
+                              color: "color-mix(in srgb, #f59e0b 70%, var(--foreground))",
+                            }}
+                          >
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#f59e0b]" />
+                            High
+                          </span>
+                          <span className="text-[11px] text-stone-500">
+                            above typical (P50–P80)
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                            style={{
+                              backgroundColor: "color-mix(in srgb, #ef4444 22%, transparent)",
+                              color: "color-mix(in srgb, #ef4444 70%, var(--foreground))",
+                            }}
+                          >
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#ef4444]" />
+                            Very high
+                          </span>
+                          <span className="text-[11px] text-stone-500">
+                            hard day (P80–P95)
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                            style={{
+                              backgroundColor: "color-mix(in srgb, #a855f7 22%, transparent)",
+                              color: "color-mix(in srgb, #a855f7 70%, var(--foreground))",
+                            }}
+                          >
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#a855f7]" />
+                            Max
+                          </span>
+                          <span className="text-[11px] text-stone-500">
+                            very rare (≥P95)
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-[10px] text-stone-500">
+                        Score is normalized to your recent training; thresholds update as you improve.
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-3 text-[11px] text-stone-500">
+                      Not enough HR + duration history yet to compute personalized effort thresholds.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </details>
 
@@ -452,6 +576,15 @@ export default async function RunningPage({
                 maxHrBpm: r.maxHrBpm,
                 userReferenceMaxHr,
                 trainingProfile,
+              }),
+              exertion: computeRunExertion({
+                run: {
+                  distanceMeters: r.distanceMeters,
+                  movingTimeSec: r.movingTimeSec,
+                  averageHrBpm: r.averageHrBpm,
+                },
+                userReferenceMaxHr: userReferenceMaxHr ?? null,
+                exertionProfile,
               }),
               name: r.name ?? "Run",
               startAtIso: r.startAt.toISOString(),

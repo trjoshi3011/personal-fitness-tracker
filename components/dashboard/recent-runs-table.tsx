@@ -25,6 +25,7 @@ export type RecentRunRow = {
   source: "STRAVA" | "FITBIT";
   providerActivityId: string | null;
   tag: RunTag;
+  exertion: { score10: number | null; level: string } | null;
   name: string;
   startAtIso: string;
   distanceMeters: number | null;
@@ -343,6 +344,44 @@ function SourcePill({ source }: { source: "STRAVA" | "FITBIT" }) {
   );
 }
 
+function ExertionPill({
+  exertion,
+}: {
+  exertion: { score10: number | null; level: string } | null;
+}) {
+  if (!exertion || exertion.score10 == null) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--ui-accent-soft)]/30 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
+        Effort —
+      </span>
+    );
+  }
+  const v = exertion.score10;
+  const color =
+    v >= 9
+      ? "#a855f7"
+      : v >= 7.5
+        ? "#ef4444"
+        : v >= 6
+          ? "#f59e0b"
+          : v >= 4.5
+            ? "#22c55e"
+            : "#06b6d4";
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+      style={{
+        backgroundColor: `color-mix(in srgb, ${color} 22%, transparent)`,
+        color: `color-mix(in srgb, ${color} 70%, var(--foreground))`,
+      }}
+      title={`Effort: ${exertion.level} · ${v.toFixed(1)}/10`}
+    >
+      <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+      {exertion.level} {v.toFixed(1)}
+    </span>
+  );
+}
+
 export function RecentRunsTable({ runs, tz }: { runs: RecentRunRow[]; tz: string }) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, DetailsState>>({});
@@ -477,6 +516,7 @@ export function RecentRunsTable({ runs, tz }: { runs: RecentRunRow[]; tz: string
                         <div className="flex items-center gap-2">
                           <RunTagBadge tag={tag} />
                           <SourcePill source={r.source} />
+                          <ExertionPill exertion={r.exertion} />
                         </div>
                         <div className="truncate font-medium text-stone-900">{r.name}</div>
                       </div>
