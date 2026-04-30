@@ -193,6 +193,38 @@ export async function fetchUserReferenceMaxHr(
   return Math.max(...candidates);
 }
 
+/**
+ * Fetch recent run distances (miles) to build an adaptive training profile.
+ * Uses both Strava runs and historical Fitbit logs.
+ */
+export async function fetchRecentRunDistancesMiForProfile(
+  userId: string,
+  take: number = 90,
+): Promise<number[]> {
+  const [strava, fitbit] = await Promise.all([
+    prisma().stravaActivity.findMany({
+      where: { userId, OR: [{ type: "Run" }, { sportType: "Run" }] },
+      orderBy: { startAt: "desc" },
+      take,
+      select: { distanceMeters: true },
+    }),
+    prisma().fitbitActivityLog.findMany({
+      where: { userId },
+      orderBy: { startAt: "desc" },
+      take,
+      select: { distanceMeters: true },
+    }),
+  ]);
+
+  const meters = [
+    ...strava.map((r) => r.distanceMeters ?? 0),
+    ...fitbit.map((r) => r.distanceMeters ?? 0),
+  ].filter((m) => typeof m === "number" && Number.isFinite(m) && m > 0);
+
+  // Convert to miles
+  return meters.map((m) => m / 1609.344);
+}
+
 /** Strava runs only — start times for calendar markers. */
 export async function fetchStravaRunStartsInRange(
   userId: string,

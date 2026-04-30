@@ -14,6 +14,7 @@ import {
   fetchRecentRunTableRows,
   fetchStravaRunStartsInRange,
   fetchUserReferenceMaxHr,
+  fetchRecentRunDistancesMiForProfile,
 } from "@/lib/merged-runs";
 import {
   activeZonedDaysOfMonth,
@@ -30,7 +31,7 @@ import {
 } from "@/lib/units";
 import { formatZonedDateShort } from "@/lib/format-zoned";
 import { normalizeUserTimezone } from "@/lib/user-timezone";
-import { classifyRun } from "@/lib/run-tag";
+import { classifyRun, computeRunTrainingProfile } from "@/lib/run-tag";
 import { getTagDefinition, type RunTagId } from "@/lib/run-tag";
 
 export const dynamic = "force-dynamic";
@@ -93,10 +94,38 @@ export default async function RunningPage({
       orderBy: { date: "asc" },
     }),
   ]);
-  const [runStartsMonth, userReferenceMaxHr] = await Promise.all([
+  const [runStartsMonth, userReferenceMaxHr, recentDistancesMi] = await Promise.all([
     fetchStravaRunStartsInRange(userId, monthRange.start, monthRange.end),
     fetchUserReferenceMaxHr(userId),
+    fetchRecentRunDistancesMiForProfile(userId, 90),
   ]);
+  // Build an adaptive training profile from your recent training:
+  // - distance distribution (long-run threshold)
+  // - HR intensity distribution (recovery/easy/tempo/threshold/intervals/race)
+  // - duration distribution (intervals vs steady)
+  const profileRuns = await fetchRecentRunTableRows(userId, 120);
+  const distancesMiProfile = profileRuns
+    .map((r) => (r.distanceMeters ?? 0) / 1609.344)
+    .filter((d) => Number.isFinite(d) && d > 0);
+  const durationsMinProfile = profileRuns
+    .map((r) => (r.movingTimeSec ?? 0) / 60)
+    .filter((m) => Number.isFinite(m) && m > 0);
+  const hrPctsProfile =
+    userReferenceMaxHr && userReferenceMaxHr > 100
+      ? profileRuns
+          .map((r) =>
+            r.averageHrBpm && r.averageHrBpm > 60
+              ? (r.averageHrBpm / userReferenceMaxHr) * 100
+              : null,
+          )
+          .filter((p): p is number => typeof p === "number" && Number.isFinite(p))
+      : [];
+
+  const trainingProfile = computeRunTrainingProfile({
+    distancesMi: distancesMiProfile,
+    durationsMin: durationsMinProfile,
+    hrPcts: hrPctsProfile,
+  });
 
   const activeRunDays = activeZonedDaysOfMonth(runStartsMonth, tz, cal.year, cal.month1);
 
@@ -342,7 +371,12 @@ export default async function RunningPage({
                     Classification key
                   </span>
                   <span className="rounded-full bg-[color:var(--ui-accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-stone-600">
-                    {userReferenceMaxHr ? `HR normalized to ${userReferenceMaxHr} bpm max` : "Uses available metrics"}
+                    {userReferenceMaxHr
+                      ? `HR normalized to ${userReferenceMaxHr} bpm max`
+                      : "Uses available metrics"}{" "}
+                    {trainingProfile.longRunMiles
+                      ? `· Long run ≥ ${trainingProfile.longRunMiles.toFixed(1)} mi`
+                      : "· Long run adapts as you progress"}
                   </span>
                 </div>
                 <span className="text-[10px] text-stone-500">Show</span>
@@ -362,6 +396,22 @@ export default async function RunningPage({
                 ] satisfies RunTagId[]
               ).map((id) => {
                 const t = getTagDefinition(id);
+                const desc =
+                  id === "long" && trainingProfile.longRunMiles
+                    ? `Long-distance aerobic run (≥${trainingProfile.longRunMiles.toFixed(1)} mi).`
+                    : id === "recovery" && trainingProfile.recoveryMaxHrPct
+                      ? `Short, low-HR shakeout (≤${trainingProfile.recoveryMaxHrPct.toFixed(0)}% max HR).`
+                      : id === "easy" && trainingProfile.tempoMinHrPct && trainingProfile.recoveryMaxHrPct
+                        ? `Conversational aerobic effort (${Math.round(trainingProfile.recoveryMaxHrPct + 1)}–${Math.round(trainingProfile.tempoMinHrPct - 1)}% max HR).`
+                        : id === "tempo" && trainingProfile.tempoMinHrPct && trainingProfile.thresholdMinHrPct
+                          ? `Comfortably hard aerobic effort (≥${trainingProfile.tempoMinHrPct.toFixed(0)}%, <${trainingProfile.thresholdMinHrPct.toFixed(0)}% max HR).`
+                          : id === "threshold" && trainingProfile.thresholdMinHrPct && trainingProfile.intervalsMinHrPct
+                            ? `Sustained effort near threshold (≥${trainingProfile.thresholdMinHrPct.toFixed(0)}%, <${trainingProfile.intervalsMinHrPct.toFixed(0)}% max HR).`
+                            : id === "intervals" && trainingProfile.intervalsMinHrPct
+                              ? `Short hard workout (≥${trainingProfile.intervalsMinHrPct.toFixed(0)}% max HR).`
+                              : id === "race" && trainingProfile.raceMinHrPct
+                                ? `All-out effort (≥${trainingProfile.raceMinHrPct.toFixed(0)}% max HR).`
+                                : t.description;
                 return (
                   <div
                     key={id}
@@ -381,7 +431,7 @@ export default async function RunningPage({
                         />
                         {t.label}
                       </span>
-                      <span className="text-[11px] text-stone-500">{t.description}</span>
+                      <span className="text-[11px] text-stone-500">{desc}</span>
                     </div>
                   </div>
                 );
@@ -401,6 +451,7 @@ export default async function RunningPage({
                 averageHrBpm: r.averageHrBpm,
                 maxHrBpm: r.maxHrBpm,
                 userReferenceMaxHr,
+                trainingProfile,
               }),
               name: r.name ?? "Run",
               startAtIso: r.startAt.toISOString(),
