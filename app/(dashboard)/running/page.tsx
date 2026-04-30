@@ -5,6 +5,7 @@ import { AreaChartView } from "@/components/charts/area-chart";
 import { BarChartView } from "@/components/charts/bar-chart";
 import { MultiLineChartView } from "@/components/charts/multi-line-chart";
 import { RunningChat } from "@/components/dashboard/running-chat";
+import { RecentRunsTable, type RecentRunRow } from "@/components/dashboard/recent-runs-table";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import type { NormalizedRun, RunTableRow } from "@/lib/merged-runs";
@@ -12,6 +13,7 @@ import {
   fetchStravaRunsInRange,
   fetchRecentRunTableRows,
   fetchStravaRunStartsInRange,
+  fetchUserReferenceMaxHr,
 } from "@/lib/merged-runs";
 import {
   activeZonedDaysOfMonth,
@@ -22,14 +24,14 @@ import {
 import { chartPalette } from "@/lib/chart-palette";
 import {
   formatPaceMinPerMile,
-  metersToFeet,
   metersToMiles,
   paceSecondsPerMile,
   secondsToHhMm,
-  secondsToHhMmSs,
 } from "@/lib/units";
-import { formatZonedDateShort, formatZonedDateShortWithYear } from "@/lib/format-zoned";
+import { formatZonedDateShort } from "@/lib/format-zoned";
 import { normalizeUserTimezone } from "@/lib/user-timezone";
+import { classifyRun } from "@/lib/run-tag";
+import { getTagDefinition, type RunTagId } from "@/lib/run-tag";
 
 export const dynamic = "force-dynamic";
 
@@ -91,11 +93,10 @@ export default async function RunningPage({
       orderBy: { date: "asc" },
     }),
   ]);
-  const runStartsMonth = await fetchStravaRunStartsInRange(
-    userId,
-    monthRange.start,
-    monthRange.end,
-  );
+  const [runStartsMonth, userReferenceMaxHr] = await Promise.all([
+    fetchStravaRunStartsInRange(userId, monthRange.start, monthRange.end),
+    fetchUserReferenceMaxHr(userId),
+  ]);
 
   const activeRunDays = activeZonedDaysOfMonth(runStartsMonth, tz, cal.year, cal.month1);
 
@@ -330,72 +331,87 @@ export default async function RunningPage({
       <section>
         <ChartCard
           title="Recent runs"
-          description="Last 30 runs (Strava + historical Fitbit logs), newest first"
+          description="Last 30 runs (Strava + historical Fitbit logs), newest first. Click a Strava run for HR zones and route."
           contentClassName="pt-0"
         >
-          <div className="overflow-x-auto">
-            <table className="w-full border-separate border-spacing-0 text-sm">
-              <thead className="text-[10px] tracking-wider text-stone-500 uppercase">
-                <tr>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">Date</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">Source</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">Run</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Distance</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Time</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Pace</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Elev</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Avg HR</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Max HR</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentRuns.length > 0 ? (
-                  recentRuns.map((r) => {
-                    const meters = r.distanceMeters ?? 0;
-                    const sec = r.movingTimeSec ?? 0;
-                    const runPace = formatPaceMinPerMile(paceSecondsPerMile({ seconds: sec, meters }));
-                    const elevFt = r.totalElevationM ? metersToFeet(r.totalElevationM) : null;
-                    return (
-                      <tr
-                        key={r.rowKey}
-                        className="border-t border-[color:var(--color-border-subtle)] transition-colors hover:bg-[color:var(--ui-accent-soft)]"
+          <details className="mb-3 rounded-2xl border border-[color:var(--color-border-subtle)] bg-card/60 px-4 py-3">
+            <summary className="cursor-pointer select-none list-none">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+                    Classification key
+                  </span>
+                  <span className="rounded-full bg-[color:var(--ui-accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-stone-600">
+                    {userReferenceMaxHr ? `HR normalized to ${userReferenceMaxHr} bpm max` : "Uses available metrics"}
+                  </span>
+                </div>
+                <span className="text-[10px] text-stone-500">Show</span>
+              </div>
+            </summary>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {(
+                [
+                  "easy",
+                  "recovery",
+                  "tempo",
+                  "threshold",
+                  "intervals",
+                  "race",
+                  "long",
+                  "unclassified",
+                ] satisfies RunTagId[]
+              ).map((id) => {
+                const t = getTagDefinition(id);
+                return (
+                  <div
+                    key={id}
+                    className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-2 backdrop-blur-sm transition-colors hover:bg-[color:var(--ui-accent-soft)]/50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                        style={{
+                          backgroundColor: `color-mix(in srgb, ${t.color} 18%, transparent)`,
+                          color: `color-mix(in srgb, ${t.color} 65%, #1e1c18)`,
+                        }}
                       >
-                        <td className="whitespace-nowrap px-3 py-2.5 text-stone-500">
-                          {formatZonedDateShortWithYear(r.startAt, tz)}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-stone-600">
-                          <span className="rounded-md bg-[color:var(--ui-accent-soft)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[color:var(--color-text-secondary)] uppercase">
-                            {r.source === "STRAVA" ? "Strava" : "Fitbit"}
-                          </span>
-                        </td>
-                        <td className="min-w-[220px] px-3 py-2.5">
-                          <div className="truncate font-medium text-stone-900">{r.name ?? "Run"}</div>
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
-                          {meters > 0 ? `${metersToMiles(meters).toFixed(2)} mi` : "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
-                          {sec > 0 ? secondsToHhMmSs(sec) : "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">{runPace}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
-                          {elevFt != null ? `${Math.round(elevFt)} ft` : "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">{r.averageHrBpm ?? "—"}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">{r.maxHrBpm ?? "—"}</td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={9} className="px-3 py-6 text-center text-stone-500">
-                      No runs found yet. Click &ldquo;Sync now&rdquo; in Settings.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                        <span
+                          className="inline-block h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: t.color }}
+                        />
+                        {t.label}
+                      </span>
+                      <span className="text-[11px] text-stone-500">{t.description}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </details>
+
+          <RecentRunsTable
+            runs={recentRuns.map<RecentRunRow>((r) => ({
+              rowKey: r.rowKey,
+              source: r.source,
+              providerActivityId: r.providerActivityId,
+              tag: classifyRun({
+                name: r.name ?? "Run",
+                distanceMeters: r.distanceMeters,
+                movingTimeSec: r.movingTimeSec,
+                averageHrBpm: r.averageHrBpm,
+                maxHrBpm: r.maxHrBpm,
+                userReferenceMaxHr,
+              }),
+              name: r.name ?? "Run",
+              startAtIso: r.startAt.toISOString(),
+              distanceMeters: r.distanceMeters,
+              movingTimeSec: r.movingTimeSec,
+              totalElevationM: r.totalElevationM,
+              averageHrBpm: r.averageHrBpm,
+              maxHrBpm: r.maxHrBpm,
+            }))}
+            tz={tz}
+          />
         </ChartCard>
       </section>
 

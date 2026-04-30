@@ -78,6 +78,8 @@ export async function fetchStravaRunsInRange(
 export type RunTableRow = {
   rowKey: string;
   source: "STRAVA" | "FITBIT";
+  /** Strava providerActivityId (string) for STRAVA rows; null for Fitbit rows. */
+  providerActivityId: string | null;
   name: string;
   startAt: Date;
   distanceMeters: number | null;
@@ -131,6 +133,7 @@ export async function fetchRecentRunTableRows(
     ...strava.map((r) => ({
       rowKey: `s:${r.providerActivityId}`,
       source: "STRAVA" as const,
+      providerActivityId: r.providerActivityId,
       name: r.name ?? "Run",
       startAt: r.startAt,
       distanceMeters: r.distanceMeters,
@@ -142,6 +145,7 @@ export async function fetchRecentRunTableRows(
     ...fitbit.map((r) => ({
       rowKey: `f:${r.logId}`,
       source: "FITBIT" as const,
+      providerActivityId: null,
       name: r.activityName ?? "Run (Fitbit)",
       startAt: r.startAt,
       distanceMeters: r.distanceMeters,
@@ -155,6 +159,38 @@ export async function fetchRecentRunTableRows(
 
   rows.sort((a, b) => b.startAt.getTime() - a.startAt.getTime());
   return rows.slice(0, take);
+}
+
+/**
+ * Returns the user's reference max HR for run intensity normalization.
+ * Uses the highest observed `maxHrBpm` across all of their runs (Strava +
+ * Fitbit). Returns null when no run has a usable HR sample.
+ *
+ * This is used by the run classifier so that intensity (Z1–Z5) is judged
+ * against the user's actual ceiling, not whatever happened in a single run.
+ */
+export async function fetchUserReferenceMaxHr(
+  userId: string,
+): Promise<number | null> {
+  const [strava, fitbit] = await Promise.all([
+    prisma().stravaActivity.aggregate({
+      where: {
+        userId,
+        OR: [{ type: "Run" }, { sportType: "Run" }],
+      },
+      _max: { maxHrBpm: true },
+    }),
+    prisma().fitbitActivityLog.aggregate({
+      where: { userId },
+      _max: { maxHeartRateBpm: true },
+    }),
+  ]);
+
+  const candidates = [strava._max.maxHrBpm, fitbit._max.maxHeartRateBpm].filter(
+    (v): v is number => typeof v === "number" && v > 100,
+  );
+  if (candidates.length === 0) return null;
+  return Math.max(...candidates);
 }
 
 /** Strava runs only — start times for calendar markers. */

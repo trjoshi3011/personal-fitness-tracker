@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { fetchStravaRunsInRange } from "@/lib/merged-runs";
 import { utcCalendarWindowBoundsMs } from "@/lib/calendar-range";
 import { metersToMiles, paceSecondsPerMile, kgToLb } from "@/lib/units";
+import { assertGeminiTextOk } from "@/lib/gemini-output-guard";
 
 const MODEL = "gemini-3-flash-preview";
 
@@ -441,6 +442,7 @@ export async function generateAiInsights(
   });
 
   const text = response.text?.trim() ?? "";
+  assertGeminiTextOk(text);
 
   let cleaned = text;
   if (cleaned.startsWith("```")) {
@@ -452,10 +454,8 @@ export async function generateAiInsights(
     parsed.generatedAt = new Date().toISOString();
     return parsed;
   } catch {
-    return {
-      summary: text.slice(0, 500),
-      sections: [],
-      generatedAt: new Date().toISOString(),
-    };
+    // Avoid displaying raw error blobs (sometimes HTML) as the "summary".
+    assertGeminiTextOk(text);
+    throw new Error("Could not parse AI insights response. Please try again.");
   }
 }

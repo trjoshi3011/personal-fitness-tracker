@@ -6,6 +6,7 @@ import {
   localCalendarParts,
   zonedDatePlusDays,
 } from "@/lib/zoned-calendar";
+import { assertGeminiTextOk } from "@/lib/gemini-output-guard";
 
 const MODEL = "gemini-3-flash-preview";
 
@@ -302,6 +303,7 @@ export async function generateTrainingPlanForTwoWeeks(
   });
 
   let text = response.text?.trim() ?? "";
+  assertGeminiTextOk(text);
   if (text.startsWith("```")) {
     text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
   }
@@ -310,6 +312,9 @@ export async function generateTrainingPlanForTwoWeeks(
     const parsed = JSON.parse(text) as unknown;
     return mergePlanToExpectedDays(expectedKeys, parsed);
   } catch {
-    return mergePlanToExpectedDays(expectedKeys, null);
+    // If the model returned an error-ish blob, surface a clean error instead of
+    // silently rendering a generic fallback plan.
+    assertGeminiTextOk(text);
+    throw new Error("Could not parse AI plan response. Please try again.");
   }
 }

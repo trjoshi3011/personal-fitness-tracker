@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { prisma } from "@/lib/db";
 import { fetchNormalizedRunsInRange, type NormalizedRun } from "@/lib/merged-runs";
 import { metersToMiles, paceSecondsPerMile } from "@/lib/units";
+import { assertGeminiTextOk } from "@/lib/gemini-output-guard";
 
 const MODEL = "gemini-3-flash-preview";
 const MAX_HISTORY_MESSAGES = 12;
@@ -176,6 +177,7 @@ export async function generateRunningChatReply(
 
   let answer = response.text?.trim();
   if (!answer) throw new Error("No response from Gemini");
+  assertGeminiTextOk(answer);
 
   // Occasionally models stop mid-thought; request short continuation(s) when needed.
   for (let i = 0; i < 2 && looksTruncated(answer); i++) {
@@ -197,5 +199,6 @@ export async function generateRunningChatReply(
     answer = `${answer}.`;
   }
 
+  assertGeminiTextOk(answer);
   return answer;
 }
