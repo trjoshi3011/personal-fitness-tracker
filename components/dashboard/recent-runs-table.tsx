@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 
@@ -11,7 +12,9 @@ import {
   secondsToHhMmSs,
 } from "@/lib/units";
 import { formatZonedDateShortWithYear } from "@/lib/format-zoned";
-import type { RunTag } from "@/lib/run-tag";
+import { HEARTRATE_ZONE_BAR_COLORS, type RunTag, getTagDefinition } from "@/lib/run-tag";
+import type { EffortLevel } from "@/lib/run-metrics";
+import { EXERTION_LEVEL_COLORS } from "@/lib/run-metrics";
 
 const RunRouteMap = dynamic(() => import("./run-route-map"), {
   ssr: false,
@@ -26,6 +29,14 @@ export type RecentRunRow = {
   providerActivityId: string | null;
   tag: RunTag;
   exertion: { score10: number | null; level: string } | null;
+  /** Bullet-point reasoning behind the classification at this run's point in time. */
+  classificationReasons: string[];
+  /** One-line summary of the thresholds in effect at the run's point in time. */
+  classificationThresholds: string;
+  /** Bullet-point reasoning behind the effort score / level. */
+  exertionReasons: string[];
+  /** One-line summary of the effort distribution in effect for this run's window. */
+  exertionThresholds: string;
   name: string;
   startAtIso: string;
   distanceMeters: number | null;
@@ -53,6 +64,7 @@ type DetailsResponse = {
   polyline?: string | null;
   zones?: ZoneBlock[];
   zonesError?: string | null;
+  zonesHint?: string | null;
   error?: string;
 };
 
@@ -65,9 +77,9 @@ type DetailsState =
       polyline: string | null;
       zones: ZoneBlock[];
       zonesError: string | null;
+      zonesHint: string | null;
     };
 
-const HR_ZONE_COLORS = ["#94a3b8", "#60a5fa", "#34d399", "#fbbf24", "#f87171"];
 const HR_ZONE_LABELS = [
   "Z1 · Recovery",
   "Z2 · Endurance",
@@ -77,12 +89,13 @@ const HR_ZONE_LABELS = [
 ];
 
 function colorForZoneIndex(idx: number, total: number) {
-  if (total <= HR_ZONE_COLORS.length) return HR_ZONE_COLORS[idx];
-  return HR_ZONE_COLORS[idx % HR_ZONE_COLORS.length];
+  const palette = HEARTRATE_ZONE_BAR_COLORS;
+  if (total <= palette.length) return palette[idx] ?? palette[palette.length - 1];
+  return palette[idx % palette.length] ?? palette[palette.length - 1];
 }
 
 function zoneLabel(idx: number, total: number, bucket: ZoneBucket) {
-  if (total === HR_ZONE_COLORS.length) return HR_ZONE_LABELS[idx];
+  if (total === HEARTRATE_ZONE_BAR_COLORS.length) return HR_ZONE_LABELS[idx];
   if (bucket.max <= 0) return `Z${idx + 1} · ${bucket.min}+ bpm`;
   return `Z${idx + 1} · ${bucket.min}–${bucket.max} bpm`;
 }
@@ -112,7 +125,7 @@ function RunTagBadge({ tag, size = "sm" }: { tag: RunTag; size?: "xs" | "sm" }) 
   );
 }
 
-function ZoneBreakdown({ zones }: { zones: ZoneBlock[] }) {
+function ZoneBreakdown({ zones, hint }: { zones: ZoneBlock[]; hint?: string | null }) {
   const hr = zones.find((z) => z.type === "heartrate");
   if (!hr || hr.buckets.length === 0) {
     return (
@@ -143,18 +156,23 @@ function ZoneBreakdown({ zones }: { zones: ZoneBlock[] }) {
   const aerobicSec = total >= 3 ? bucketsWithMeta[2].bucket.timeSec : 0;
   const hardSec = bucketsWithMeta.slice(3).reduce((a, x) => a + x.bucket.timeSec, 0);
   const blend = [
-    { label: "Easy", subtitle: "Z1–Z2", sec: easySec, color: HR_ZONE_COLORS[1] },
-    { label: "Aerobic", subtitle: "Z3", sec: aerobicSec, color: HR_ZONE_COLORS[2] },
-    { label: "Hard", subtitle: "Z4–Z5", sec: hardSec, color: HR_ZONE_COLORS[4] },
+    { label: "Easy", subtitle: "Z1–Z2", sec: easySec, color: getTagDefinition("easy").color },
+    { label: "Aerobic", subtitle: "Z3", sec: aerobicSec, color: getTagDefinition("tempo").color },
+    { label: "Hard", subtitle: "Z4–Z5", sec: hardSec, color: getTagDefinition("intervals").color },
   ];
 
   return (
     <div className="flex h-full flex-col gap-4">
-      <div className="flex items-baseline justify-between">
-        <h4 className="text-xs font-semibold tracking-wider text-stone-600 uppercase">
-          Heart rate zones
-        </h4>
-        <span className="text-[10px] text-stone-500">Total {fmtHms(totalTime)}</span>
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="min-w-0">
+          <h4 className="text-xs font-semibold tracking-wider text-stone-600 uppercase">
+            Heart rate zones
+          </h4>
+          {hint ? (
+            <p className="mt-0.5 text-[10px] leading-snug text-stone-500">{hint}</p>
+          ) : null}
+        </div>
+        <span className="shrink-0 text-[10px] text-stone-500">Total {fmtHms(totalTime)}</span>
       </div>
 
       <div>
@@ -260,7 +278,48 @@ function SparkBar({ pct, color }: { pct: number; color: string }) {
   );
 }
 
-function ExpandedPanel({ tag, state }: { tag: RunTag; state: DetailsState }) {
+function ReasoningBlock({
+  title,
+  badge,
+  reasons,
+  thresholds,
+}: {
+  title: string;
+  badge: ReactNode;
+  reasons: string[];
+  thresholds: string;
+}) {
+  return (
+    <div className="rounded-lg border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-2">
+      <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+        <span className="text-[9px] font-semibold tracking-wider text-stone-500 uppercase">
+          {title}
+        </span>
+        {badge}
+      </div>
+      <ul className="space-y-1 text-[11px] leading-snug text-stone-700">
+        {reasons.map((r, i) => (
+          <li key={i} className="flex gap-1.5">
+            <span
+              aria-hidden
+              className="mt-1.5 inline-block h-1 w-1 shrink-0 rounded-full bg-stone-400"
+            />
+            <span>{r}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-1.5 text-[9px] leading-snug text-stone-500">{thresholds}</div>
+    </div>
+  );
+}
+
+function ExpandedPanel({
+  row,
+  state,
+}: {
+  row: RecentRunRow;
+  state: DetailsState;
+}) {
   if (state.status === "loading") {
     return (
       <div className="vf-fade-in-up flex items-center justify-center py-8 text-sm text-stone-500">
@@ -280,8 +339,10 @@ function ExpandedPanel({ tag, state }: { tag: RunTag; state: DetailsState }) {
   const hasZones =
     !!hr && hr.buckets.length > 0 && hr.buckets.some((b) => b.timeSec > 0);
   const hasRoute = !!state.polyline && state.polyline.length > 0;
+  const hasClassReason = row.classificationReasons.length > 0;
+  const hasEffortReason = row.exertionReasons.length > 0;
 
-  if (!hasZones && !hasRoute) {
+  if (!hasZones && !hasRoute && !hasClassReason && !hasEffortReason) {
     return (
       <div className="vf-fade-in-up py-4 text-sm text-stone-500">
         Run information not available.
@@ -289,21 +350,34 @@ function ExpandedPanel({ tag, state }: { tag: RunTag; state: DetailsState }) {
     );
   }
 
+  const tag = row.tag;
   return (
-    <div className="vf-fade-in-up">
-      {/* Tag context bar — same tag as the row badge. */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--ui-accent-soft)]/30 px-3 py-2">
-        <span className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
-          Classification
-        </span>
-        <RunTagBadge tag={tag} />
-        <span className="text-[11px] text-stone-500">{tag.description}</span>
-      </div>
+    <div className="vf-fade-in-up space-y-3">
+      {(hasClassReason || hasEffortReason) ? (
+        <div className="grid gap-2 md:grid-cols-2">
+          {hasClassReason ? (
+            <ReasoningBlock
+              title="Why this classification"
+              badge={<RunTagBadge tag={tag} size="xs" />}
+              reasons={row.classificationReasons}
+              thresholds={row.classificationThresholds}
+            />
+          ) : null}
+          {hasEffortReason ? (
+            <ReasoningBlock
+              title="Why this effort score"
+              badge={<ExertionPill exertion={row.exertion} />}
+              reasons={row.exertionReasons}
+              thresholds={row.exertionThresholds}
+            />
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid items-stretch gap-6 md:grid-cols-2">
         <div className="flex min-w-0 flex-col">
           {hasZones ? (
-            <ZoneBreakdown zones={state.zones} />
+            <ZoneBreakdown zones={state.zones} hint={state.zonesHint} />
           ) : (
             <p className="text-sm text-stone-500">
               {state.zonesError ?? "Heart rate zone data is not available for this run."}
@@ -350,23 +424,23 @@ function ExertionPill({
   exertion: { score10: number | null; level: string } | null;
 }) {
   if (!exertion || exertion.score10 == null) {
+    const u = EXERTION_LEVEL_COLORS.Unclassified;
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--ui-accent-soft)]/30 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-stone-500 uppercase">
+      <span
+        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+        style={{
+          backgroundColor: `color-mix(in srgb, ${u} 18%, transparent)`,
+          color: `color-mix(in srgb, ${u} 55%, var(--foreground))`,
+        }}
+      >
+        <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: u }} />
         Effort —
       </span>
     );
   }
   const v = exertion.score10;
   const color =
-    v >= 9
-      ? "#a855f7"
-      : v >= 7.5
-        ? "#ef4444"
-        : v >= 6
-          ? "#f59e0b"
-          : v >= 4.5
-            ? "#22c55e"
-            : "#06b6d4";
+    EXERTION_LEVEL_COLORS[exertion.level as EffortLevel] ?? EXERTION_LEVEL_COLORS.Unclassified;
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
@@ -414,6 +488,7 @@ export function RecentRunsTable({ runs, tz }: { runs: RecentRunRow[]; tz: string
           polyline: json.polyline ?? null,
           zones: json.zones ?? [],
           zonesError: json.zonesError ?? null,
+          zonesHint: json.zonesHint ?? null,
         },
       }));
     } catch (e) {
@@ -568,7 +643,7 @@ export function RecentRunsTable({ runs, tz }: { runs: RecentRunRow[]; tz: string
                         className="vf-expand-in rounded-xl bg-[color:var(--color-bg-surface)]/85 px-5 py-5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ui-accent)_20%,transparent)] backdrop-blur-sm"
                       >
                         <ExpandedPanel
-                          tag={tag}
+                          row={r}
                           state={details[r.rowKey] ?? { status: "loading" }}
                         />
                       </td>

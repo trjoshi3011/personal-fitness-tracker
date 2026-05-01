@@ -13,7 +13,6 @@ import {
   fetchStravaRunsInRange,
   fetchRecentRunTableRows,
   fetchStravaRunStartsInRange,
-  fetchUserReferenceMaxHr,
   fetchRecentRunDistancesMiForProfile,
 } from "@/lib/merged-runs";
 import {
@@ -31,13 +30,17 @@ import {
 } from "@/lib/units";
 import { formatZonedDateShort } from "@/lib/format-zoned";
 import { normalizeUserTimezone } from "@/lib/user-timezone";
-import { classifyRun, computeRunTrainingProfile } from "@/lib/run-tag";
-import { getTagDefinition, type RunTagId } from "@/lib/run-tag";
 import {
-  buildExertionProfile,
-  computeRunExertion,
-  computeRawExertion,
-} from "@/lib/run-metrics";
+  classifyRunWithReason,
+  getTagDefinition,
+  MIN_SAMPLES_FOR_ROLLING_ADAPTIVE,
+  type RunTagId,
+} from "@/lib/run-tag";
+import { explainRunExertion, EXERTION_LEVEL_COLORS } from "@/lib/run-metrics";
+import {
+  buildPerRunHistoricalContexts,
+  RUN_LABEL_HISTORY_WINDOW,
+} from "@/lib/run-history-snapshot";
 
 export const dynamic = "force-dynamic";
 
@@ -99,51 +102,29 @@ export default async function RunningPage({
       orderBy: { date: "asc" },
     }),
   ]);
-  const [runStartsMonth, userReferenceMaxHr, recentDistancesMi] = await Promise.all([
+  const [runStartsMonth, recentDistancesMi] = await Promise.all([
     fetchStravaRunStartsInRange(userId, monthRange.start, monthRange.end),
-    fetchUserReferenceMaxHr(userId),
     fetchRecentRunDistancesMiForProfile(userId, 90),
   ]);
-  // Build an adaptive training profile from your recent training:
-  // - distance distribution (long-run threshold)
-  // - HR intensity distribution (recovery/easy/tempo/threshold/intervals/race)
-  // - duration distribution (intervals vs steady)
-  const profileRuns = await fetchRecentRunTableRows(userId, 120);
-  const distancesMiProfile = profileRuns
-    .map((r) => (r.distanceMeters ?? 0) / 1609.344)
-    .filter((d) => Number.isFinite(d) && d > 0);
-  const durationsMinProfile = profileRuns
-    .map((r) => (r.movingTimeSec ?? 0) / 60)
-    .filter((m) => Number.isFinite(m) && m > 0);
-  const hrPctsProfile =
-    userReferenceMaxHr && userReferenceMaxHr > 100
-      ? profileRuns
-          .map((r) =>
-            r.averageHrBpm && r.averageHrBpm > 60
-              ? (r.averageHrBpm / userReferenceMaxHr) * 100
-              : null,
-          )
-          .filter((p): p is number => typeof p === "number" && Number.isFinite(p))
-      : [];
 
-  const trainingProfile = computeRunTrainingProfile({
-    distancesMi: distancesMiProfile,
-    durationsMin: durationsMinProfile,
-    hrPcts: hrPctsProfile,
-  });
+  // Pull run history so each row can be labeled from a rolling window of the
+  // last RUN_LABEL_HISTORY_WINDOW runs ending at that activity (same idea for
+  // the newest run = "today" in the keys). Past rows keep their prior label.
+  const HISTORY_POOL_LIMIT = 5000;
+  const historyDescAll = await fetchRecentRunTableRows(userId, HISTORY_POOL_LIMIT);
+  const historyAsc = [...historyDescAll].sort(
+    (a, b) => a.startAt.getTime() - b.startAt.getTime(),
+  );
 
-  // Exertion profile (normalize exertion scores to your recent training).
-  const rawExertions = profileRuns
-    .map((r) =>
-      computeRawExertion({
-        distanceMeters: r.distanceMeters,
-        movingTimeSec: r.movingTimeSec,
-        averageHrBpm: r.averageHrBpm,
-        userReferenceMaxHr: userReferenceMaxHr ?? null,
-      }),
-    )
-    .filter((x): x is number => typeof x === "number" && Number.isFinite(x));
-  const exertionProfile = buildExertionProfile(rawExertions);
+  const { byRowKey: contextByRowKey, latest: latestContext } =
+    buildPerRunHistoricalContexts({
+      historyAsc,
+      rowKeysToLabel: historyDescAll.slice(0, 30).map((r) => r.rowKey),
+    });
+
+  const trainingProfile = latestContext.trainingProfile;
+  const exertionProfile = latestContext.exertionProfile;
+  const userReferenceMaxHr = latestContext.userReferenceMaxHr;
 
 
   const activeRunDays = activeZonedDaysOfMonth(runStartsMonth, tz, cal.year, cal.month1);
@@ -404,8 +385,13 @@ export default async function RunningPage({
             </summary>
             <div className="mt-3 grid gap-4 lg:grid-cols-2">
               <div>
-                <div className="mb-2 text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
-                  Classification key
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+                    Classification key
+                  </div>
+                  <span className="text-[10px] text-stone-500">
+                    From your last {RUN_LABEL_HISTORY_WINDOW} runs (older rows keep their label)
+                  </span>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {(
@@ -470,92 +456,63 @@ export default async function RunningPage({
                     Effort key
                   </div>
                   <span className="text-[10px] text-stone-500">
-                    Exertion score (0–10) from HR intensity + duration
+                    0–10 from HR load, pace stress, and hills — weighted ~55% / 30% / 15% when all apply;
+                    weights rebalance if HR, pace baseline, or elevation is missing.
                   </span>
                 </div>
 
                 <div className="grid gap-2">
                   {exertionProfile ? (
                     <>
-                      <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
-                            style={{
-                              backgroundColor: "color-mix(in srgb, #22c55e 22%, transparent)",
-                              color: "color-mix(in srgb, #22c55e 70%, var(--foreground))",
-                            }}
+                      {(
+                        [
+                          [
+                            "Moderate",
+                            `≤ typical (≤P50 within last ${RUN_LABEL_HISTORY_WINDOW} runs)`,
+                          ] as const,
+                          ["High", "above typical (P50–P80)"] as const,
+                          ["Very high", "hard day (P80–P95)"] as const,
+                          ["Max", "very rare (≥P95)"] as const,
+                        ] as const
+                      ).map(([level, desc]) => {
+                        const c = EXERTION_LEVEL_COLORS[level];
+                        return (
+                          <div
+                            key={level}
+                            className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-2"
                           >
-                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#22c55e]" />
-                            Moderate
-                          </span>
-                          <span className="text-[11px] text-stone-500">
-                            ≤ typical (≤P50 of your recent exertion)
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
-                            style={{
-                              backgroundColor: "color-mix(in srgb, #f59e0b 22%, transparent)",
-                              color: "color-mix(in srgb, #f59e0b 70%, var(--foreground))",
-                            }}
-                          >
-                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#f59e0b]" />
-                            High
-                          </span>
-                          <span className="text-[11px] text-stone-500">
-                            above typical (P50–P80)
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
-                            style={{
-                              backgroundColor: "color-mix(in srgb, #ef4444 22%, transparent)",
-                              color: "color-mix(in srgb, #ef4444 70%, var(--foreground))",
-                            }}
-                          >
-                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#ef4444]" />
-                            Very high
-                          </span>
-                          <span className="text-[11px] text-stone-500">
-                            hard day (P80–P95)
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
-                            style={{
-                              backgroundColor: "color-mix(in srgb, #a855f7 22%, transparent)",
-                              color: "color-mix(in srgb, #a855f7 70%, var(--foreground))",
-                            }}
-                          >
-                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#a855f7]" />
-                            Max
-                          </span>
-                          <span className="text-[11px] text-stone-500">
-                            very rare (≥P95)
-                          </span>
-                        </div>
-                      </div>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                                style={{
+                                  backgroundColor: `color-mix(in srgb, ${c} 22%, transparent)`,
+                                  color: `color-mix(in srgb, ${c} 70%, var(--foreground))`,
+                                }}
+                              >
+                                <span
+                                  className="inline-block h-1.5 w-1.5 rounded-full"
+                                  style={{ backgroundColor: c }}
+                                />
+                                {level}
+                              </span>
+                              <span className="text-[11px] text-stone-500">{desc}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
 
                       <div className="text-[10px] text-stone-500">
-                        Score is normalized to your recent training; thresholds update as you improve.
+                        Each run uses only the last {RUN_LABEL_HISTORY_WINDOW} runs ending on that
+                        day (max HR in that window, adaptive HR/distance cutoffs, pace and elevation
+                        baselines, and exertion percentiles). Older rows do not change when you log
+                        new runs.
                       </div>
                     </>
                   ) : (
                     <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-surface)]/60 px-3 py-3 text-[11px] text-stone-500">
-                      Not enough HR + duration history yet to compute personalized effort thresholds.
+                      Not enough recent runs yet to build a personalized effort distribution (need at
+                      least {MIN_SAMPLES_FOR_ROLLING_ADAPTIVE} scored activities with distance and
+                      time).
                     </div>
                   )}
                 </div>
@@ -564,36 +521,47 @@ export default async function RunningPage({
           </details>
 
           <RecentRunsTable
-            runs={recentRuns.map<RecentRunRow>((r) => ({
-              rowKey: r.rowKey,
-              source: r.source,
-              providerActivityId: r.providerActivityId,
-              tag: classifyRun({
+            runs={recentRuns.map<RecentRunRow>((r) => {
+              const ctx = contextByRowKey.get(r.rowKey) ?? latestContext;
+              const cls = classifyRunWithReason({
                 name: r.name ?? "Run",
                 distanceMeters: r.distanceMeters,
                 movingTimeSec: r.movingTimeSec,
                 averageHrBpm: r.averageHrBpm,
                 maxHrBpm: r.maxHrBpm,
-                userReferenceMaxHr,
-                trainingProfile,
-              }),
-              exertion: computeRunExertion({
+                userReferenceMaxHr: ctx.userReferenceMaxHr,
+                trainingProfile: ctx.trainingProfile,
+              });
+              const eff = explainRunExertion({
                 run: {
                   distanceMeters: r.distanceMeters,
                   movingTimeSec: r.movingTimeSec,
                   averageHrBpm: r.averageHrBpm,
+                  totalElevationM: r.totalElevationM,
                 },
-                userReferenceMaxHr: userReferenceMaxHr ?? null,
-                exertionProfile,
-              }),
-              name: r.name ?? "Run",
-              startAtIso: r.startAt.toISOString(),
-              distanceMeters: r.distanceMeters,
-              movingTimeSec: r.movingTimeSec,
-              totalElevationM: r.totalElevationM,
-              averageHrBpm: r.averageHrBpm,
-              maxHrBpm: r.maxHrBpm,
-            }))}
+                userReferenceMaxHr: ctx.userReferenceMaxHr,
+                exertionProfile: ctx.exertionProfile,
+                baselines: ctx.paceElevationBaselines,
+              });
+              return {
+                rowKey: r.rowKey,
+                source: r.source,
+                providerActivityId: r.providerActivityId,
+                tag: cls.tag,
+                exertion: eff.exertion,
+                classificationReasons: cls.reasons,
+                classificationThresholds: cls.thresholdsSummary,
+                exertionReasons: eff.reasons,
+                exertionThresholds: eff.thresholdsSummary,
+                name: r.name ?? "Run",
+                startAtIso: r.startAt.toISOString(),
+                distanceMeters: r.distanceMeters,
+                movingTimeSec: r.movingTimeSec,
+                totalElevationM: r.totalElevationM,
+                averageHrBpm: r.averageHrBpm,
+                maxHrBpm: r.maxHrBpm,
+              };
+            })}
             tz={tz}
           />
         </ChartCard>

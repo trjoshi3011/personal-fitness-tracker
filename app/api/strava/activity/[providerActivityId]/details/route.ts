@@ -3,20 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { getValidStravaAccessTokenForUser } from "@/lib/strava";
-
-type StravaZoneBucket = {
-  min: number;
-  max: number;
-  time: number;
-};
-
-type StravaActivityZone = {
-  type?: string;
-  sensor_based?: boolean;
-  points?: number;
-  custom_zones?: boolean;
-  distribution_buckets?: StravaZoneBucket[];
-};
+import { fetchOrComputeActivityHrZones, HR_ZONE_SCHEMES } from "@/lib/hr-zones";
 
 type ZoneBucket = {
   min: number;
@@ -55,7 +42,7 @@ export async function GET(
       where: {
         userId_providerActivityId: { userId, providerActivityId },
       },
-      select: { providerActivityId: true, rawPayload: true },
+      select: { providerActivityId: true, rawPayload: true, maxHrBpm: true },
     });
     if (!activity) {
       return NextResponse.json(
@@ -65,49 +52,43 @@ export async function GET(
     }
 
     const polyline = extractPolyline(activity.rawPayload);
-
     const accessToken = await getValidStravaAccessTokenForUser(userId);
+
+    /**
+     * We compute zones ourselves from the HR stream against the user's HR profile
+     * (max HR + scheme). Strava's /zones is Summit-only and returns 402 for many
+     * athletes, so we don't depend on it.
+     */
+    const result = await fetchOrComputeActivityHrZones({
+      userId,
+      providerActivityId,
+      accessToken,
+      activityMaxHrBpm: activity.maxHrBpm,
+    });
 
     let zones: ZoneBlock[] = [];
     let zonesError: string | null = null;
-    if (accessToken) {
-      try {
-        const res = await fetch(
-          `https://www.strava.com/api/v3/activities/${encodeURIComponent(
-            providerActivityId,
-          )}/zones`,
-          { headers: { authorization: `Bearer ${accessToken}` } },
-        );
-        if (res.ok) {
-          const data = (await res.json().catch(() => null)) as
-            | StravaActivityZone[]
-            | null;
-          if (Array.isArray(data)) {
-            zones = data.map((z) => ({
-              type: (z.type ?? "unknown") as ZoneBlock["type"],
-              sensorBased: Boolean(z.sensor_based),
-              customZones: Boolean(z.custom_zones),
-              buckets: Array.isArray(z.distribution_buckets)
-                ? z.distribution_buckets.map((b) => ({
-                    min: typeof b.min === "number" ? b.min : 0,
-                    max: typeof b.max === "number" ? b.max : 0,
-                    timeSec: typeof b.time === "number" ? b.time : 0,
-                  }))
-                : [],
-            }));
-          }
-        } else if (res.status === 404) {
-          zonesError = "Zone data not available for this run.";
-        } else if (res.status === 401 || res.status === 403) {
-          zonesError = "Strava authorization expired. Reconnect Strava in Settings.";
-        } else {
-          zonesError = `Strava zones request failed (${res.status}).`;
-        }
-      } catch {
-        zonesError = "Could not load zone data from Strava.";
-      }
+    let zonesHint: string | null = null;
+    if (result.ok) {
+      const edges = result.aggregate.zoneEdgesBpm;
+      const durs = result.aggregate.zoneDurationsSec;
+      const buckets: ZoneBucket[] = durs.map((sec, i) => ({
+        min: edges[i] ?? 0,
+        max: edges[i + 1] ?? edges[i] ?? 0,
+        timeSec: sec,
+      }));
+      zones = [
+        {
+          type: "heartrate",
+          sensorBased: true,
+          customZones: false,
+          buckets,
+        },
+      ];
+      const scheme = HR_ZONE_SCHEMES[result.schemeKey];
+      zonesHint = `Computed from your HR stream against ${result.hrMaxBpm} bpm max (${scheme?.description ?? "your scheme"})${result.cached ? " — cached" : ""}.`;
     } else {
-      zonesError = "Connect Strava in Settings to view zone data.";
+      zonesError = result.message;
     }
 
     return NextResponse.json({
@@ -115,6 +96,7 @@ export async function GET(
       polyline,
       zones,
       zonesError,
+      zonesHint,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";

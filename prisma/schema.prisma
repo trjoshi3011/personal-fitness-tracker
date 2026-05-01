@@ -36,11 +36,20 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// HR zone profile (used to compute time-in-zone for Strava activities).
+  /// hrMaxBpm: athlete max HR (user-input or 220 - age). null = unknown.
+  /// hrRestBpm: resting HR (optional; required for Karvonen / %threshold schemes).
+  /// hrZoneScheme: which zone formula to apply (e.g. "percent_max").
+  hrMaxBpm     Int?
+  hrRestBpm    Int?
+  hrZoneScheme String  @default("percent_max")
+
   connectedAccounts   ConnectedAccount[]
   dailyFitbitStats         DailyFitbitStat[]
   dailyWhoopStats          DailyWhoopStat[]
   fitbitActivityLogs       FitbitActivityLog[]
   stravaActivities         StravaActivity[]
+  stravaActivityHrZones    StravaActivityHrZones[]
   derivedDailyMetrics      DerivedDailyMetric[]
   syncLogs                 SyncLog[]
   sessions                 Session[]
@@ -51,6 +60,43 @@ model User {
   liftSplitWeeklyTarget    LiftSplitWeeklyTarget?
 
   @@index([createdAt])
+}
+
+/**
+ * Cached time-in-zone (HR) for a Strava activity computed from streams.
+ * One row per (userId, providerActivityId). Stale rows are recomputed when
+ * the user changes their HR profile (max / rest / scheme).
+ */
+model StravaActivityHrZones {
+  id     String @id @default(cuid())
+  userId String
+  providerActivityId String
+
+  /// Snapshot of inputs used so we can detect staleness and recompute on change.
+  schemeKey  String
+  hrMaxBpm   Int
+  hrRestBpm  Int?
+
+  /// Zone edges (bpm) used at compute time. Length = numZones + 1.
+  /// e.g. [hrAtZ1Min, z1Max, z2Max, z3Max, z4Max, z5Max]
+  zoneEdgesBpm Json
+
+  /// Seconds spent in each zone (length = numZones).
+  zoneDurationsSec Json
+
+  /// Total seconds covered by HR samples.
+  totalSeconds Int
+
+  /// Activity max HR observed in stream (informational).
+  observedMaxBpm Int?
+
+  computedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, providerActivityId])
+  @@index([userId, computedAt])
 }
 
 model Session {

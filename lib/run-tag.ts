@@ -11,6 +11,13 @@
  * "unclassified" tag so the user can see at a glance which runs lack signal.
  */
 
+/**
+ * Minimum runs in a rolling window before we trust adaptive percentiles
+ * (HR cutoffs, long-run distance, duration heuristics). Matches small windows
+ * (e.g. last 10 runs) while staying above pure guesswork.
+ */
+export const MIN_SAMPLES_FOR_ROLLING_ADAPTIVE = 4;
+
 export type RunTagId =
   | "race"
   | "long"
@@ -72,6 +79,18 @@ const TAGS: Record<RunTagId, Omit<RunTag, "id">> = {
     color: "#94a3b8",
   },
 };
+
+/**
+ * Strava-style Z1–Z5 bar colors, aligned with classification tag accents
+ * (recovery → intervals) so expanded zone logs match the classification key.
+ */
+export const HEARTRATE_ZONE_BAR_COLORS = [
+  TAGS.recovery.color,
+  TAGS.easy.color,
+  TAGS.tempo.color,
+  TAGS.intervals.color,
+  TAGS.threshold.color,
+] as const;
 
 function tagOf(id: RunTagId): RunTag {
   return { id, ...TAGS[id] };
@@ -178,7 +197,7 @@ export function computeRunTrainingProfile(args: {
   const sortedDistances = [...cleanDistances].sort((a, b) => a - b);
 
   const longRunMiles =
-    sampleCount < 6
+    sampleCount < MIN_SAMPLES_FOR_ROLLING_ADAPTIVE
       ? null
       : roundToHalf(
           clamp(
@@ -194,7 +213,7 @@ export function computeRunTrainingProfile(args: {
   const hrClean = (args.hrPcts ?? []).filter((p) => Number.isFinite(p) && p > 40 && p < 105);
   const hrSampleCount = hrClean.length;
   const hrSorted = [...hrClean].sort((a, b) => a - b);
-  const hasHr = hrSampleCount >= 8;
+  const hasHr = hrSampleCount >= MIN_SAMPLES_FOR_ROLLING_ADAPTIVE;
 
   const recoveryMaxHrPct = hasHr ? clamp(percentile(hrSorted, 20), 55, 72) : null;
   const easyMaxHrPct = hasHr
@@ -216,9 +235,13 @@ export function computeRunTrainingProfile(args: {
   const durClean = (args.durationsMin ?? []).filter((m) => Number.isFinite(m) && m > 3 && m < 400);
   const durSorted = [...durClean].sort((a, b) => a - b);
   const recoveryMaxDurationMin =
-    durClean.length >= 8 ? clamp(roundToHalf(percentile(durSorted, 35)), 15, 45) : null;
+    durClean.length >= MIN_SAMPLES_FOR_ROLLING_ADAPTIVE
+      ? clamp(roundToHalf(percentile(durSorted, 35)), 15, 45)
+      : null;
   const intervalsMaxDurationMin =
-    durClean.length >= 8 ? clamp(roundToHalf(percentile(durSorted, 35)), 20, 60) : null;
+    durClean.length >= MIN_SAMPLES_FOR_ROLLING_ADAPTIVE
+      ? clamp(roundToHalf(percentile(durSorted, 35)), 20, 60)
+      : null;
 
   return {
     longRunMiles,
@@ -235,7 +258,25 @@ export function computeRunTrainingProfile(args: {
   };
 }
 
-export function classifyRun(input: ClassifyInput): RunTag {
+export type ClassifyExplanation = {
+  tag: RunTag;
+  /** Short ordered bullet points describing how the tag was decided. */
+  reasons: string[];
+  /**
+   * One-line summary of the thresholds in effect when the run was labeled
+   * (e.g. "Adaptive thresholds from 9 of last 10 runs" or "Default thresholds").
+   */
+  thresholdsSummary: string;
+};
+
+function fmtPctRange(a: number | null, b: number | null) {
+  if (a == null && b == null) return "n/a";
+  if (a == null) return `<${(b as number).toFixed(0)}%`;
+  if (b == null) return `≥${a.toFixed(0)}%`;
+  return `${a.toFixed(0)}–${b.toFixed(0)}%`;
+}
+
+export function classifyRunWithReason(input: ClassifyInput): ClassifyExplanation {
   const distanceMi =
     input.distanceMeters != null && input.distanceMeters > 0
       ? input.distanceMeters / 1609.344
@@ -245,12 +286,24 @@ export function classifyRun(input: ClassifyInput): RunTag {
       ? input.movingTimeSec / 60
       : 0;
 
+  const p = input.trainingProfile ?? null;
+  const adaptive =
+    !!p && (p.hrSampleCount >= MIN_SAMPLES_FOR_ROLLING_ADAPTIVE || (p.longRunMiles ?? 0) > 0);
+  const thresholdsSummary = adaptive
+    ? `Adaptive thresholds from ${p?.hrSampleCount ?? 0} HR-tagged of ${p?.sampleCount ?? 0} recent runs at the time.`
+    : "Default thresholds (not enough recent runs to personalize).";
+
   // 1. Explicit name hint always wins — that's the user's stated intent.
   const fromName = classifyFromName(input.name);
-  if (fromName) return tagOf(fromName);
+  if (fromName) {
+    return {
+      tag: tagOf(fromName),
+      reasons: [`Run name "${input.name ?? "Run"}" matched the ${fromName} pattern.`],
+      thresholdsSummary,
+    };
+  }
 
-  // 2. Distance-defined long run (adaptive). Defined by distance alone so it
-  //    works even without HR signal.
+  // 2. Distance-defined long run (adaptive). Works even without HR signal.
   const longFromProfile = input.trainingProfile?.longRunMiles;
   const longThreshold =
     longFromProfile === null
@@ -262,10 +315,21 @@ export function classifyRun(input: ClassifyInput): RunTag {
           : typeof input.userLongRunMiles === "number" && input.userLongRunMiles > 0
             ? input.userLongRunMiles
             : 10;
-  if (longThreshold != null && distanceMi >= longThreshold) return tagOf("long");
+  if (longThreshold != null && distanceMi >= longThreshold) {
+    const longSrc =
+      typeof longFromProfile === "number" && longFromProfile > 0
+        ? `derived from your training at the time`
+        : `fallback default (10 mi)`;
+    return {
+      tag: tagOf("long"),
+      reasons: [
+        `Distance ${distanceMi.toFixed(1)} mi ≥ long-run threshold ${longThreshold.toFixed(1)} mi (${longSrc}).`,
+      ],
+      thresholdsSummary,
+    };
+  }
 
-  // 3. We need HR signal to classify intensity. Without it, mark as
-  //    unclassified (unless distance was sufficient for the long-run rule).
+  // 3. We need HR signal to classify intensity.
   const avg = input.averageHrBpm ?? null;
   const ownMax = input.maxHrBpm ?? null;
   const ref =
@@ -275,19 +339,31 @@ export function classifyRun(input: ClassifyInput): RunTag {
 
   const hrSane = avg != null && avg > 60 && ref != null && ref > 100;
   if (!hrSane || distanceMi <= 0 || durationMin <= 0) {
-    return tagOf("unclassified");
+    const missing: string[] = [];
+    if (!(distanceMi > 0)) missing.push("distance");
+    if (!(durationMin > 0)) missing.push("duration");
+    if (avg == null || avg <= 60) missing.push("avg HR");
+    if (ref == null || ref <= 100) missing.push("reference max HR");
+    return {
+      tag: tagOf("unclassified"),
+      reasons: [
+        missing.length > 0
+          ? `Missing required signal: ${missing.join(", ")}.`
+          : "Not enough signal to classify.",
+      ],
+      thresholdsSummary,
+    };
   }
 
   const hrPct = ((avg as number) / (ref as number)) * 100;
+  const refSrc =
+    typeof input.userReferenceMaxHr === "number" && input.userReferenceMaxHr > 100
+      ? "your observed max in the window"
+      : "this run's max HR";
+  const hrLine = `Avg HR ${avg} bpm = ${hrPct.toFixed(0)}% of ${ref} bpm (${refSrc}).`;
 
-  // 4. Intensity buckets (adaptive). Order matters — race trumps intervals trumps threshold.
-  const p = input.trainingProfile ?? null;
-  if (p && p.hrSampleCount < 8) {
-    // Not enough HR history for adaptive intensity — keep it unclassified
-    // unless the user named the workout.
-    return tagOf("unclassified");
-  }
-
+  // 4. Intensity buckets. Adaptive cutoffs when the profile has enough HR samples;
+  // otherwise fixed defaults (same behavior for sparse windows).
   const raceMin = p?.raceMinHrPct ?? 92;
   const intervalsMin = p?.intervalsMinHrPct ?? 88;
   const thresholdMin = p?.thresholdMinHrPct ?? 85;
@@ -295,14 +371,75 @@ export function classifyRun(input: ClassifyInput): RunTag {
   const recoveryMax = p?.recoveryMaxHrPct ?? 65;
   const intervalsMaxDur = p?.intervalsMaxDurationMin ?? 45;
   const recoveryMaxDur = p?.recoveryMaxDurationMin ?? 35;
+  const adaptiveHr = !!p && p.hrSampleCount >= MIN_SAMPLES_FOR_ROLLING_ADAPTIVE;
+  const cutoffSrc = adaptiveHr ? "adaptive" : "default";
 
-  if (hrPct >= raceMin) return tagOf("race");
-  if (hrPct >= intervalsMin && durationMin <= intervalsMaxDur) return tagOf("intervals");
-  if (hrPct >= thresholdMin) return tagOf("threshold");
-  if (hrPct >= tempoMin) return tagOf("tempo");
-  if (hrPct <= recoveryMax && distanceMi < 4 && durationMin <= recoveryMaxDur) return tagOf("recovery");
-  return tagOf("easy");
+  if (hrPct >= raceMin) {
+    return {
+      tag: tagOf("race"),
+      reasons: [
+        hrLine,
+        `${hrPct.toFixed(0)}% ≥ race cutoff ${raceMin.toFixed(0)}% (${cutoffSrc}).`,
+      ],
+      thresholdsSummary,
+    };
+  }
+  if (hrPct >= intervalsMin && durationMin <= intervalsMaxDur) {
+    return {
+      tag: tagOf("intervals"),
+      reasons: [
+        hrLine,
+        `${hrPct.toFixed(0)}% ≥ intervals cutoff ${intervalsMin.toFixed(0)}% (${cutoffSrc}).`,
+        `Duration ${durationMin.toFixed(0)} min ≤ intervals duration cap ${intervalsMaxDur.toFixed(0)} min.`,
+      ],
+      thresholdsSummary,
+    };
+  }
+  if (hrPct >= thresholdMin) {
+    return {
+      tag: tagOf("threshold"),
+      reasons: [
+        hrLine,
+        `${hrPct.toFixed(0)}% in threshold band ${fmtPctRange(thresholdMin, intervalsMin)} (${cutoffSrc}).`,
+      ],
+      thresholdsSummary,
+    };
+  }
+  if (hrPct >= tempoMin) {
+    return {
+      tag: tagOf("tempo"),
+      reasons: [
+        hrLine,
+        `${hrPct.toFixed(0)}% in tempo band ${fmtPctRange(tempoMin, thresholdMin)} (${cutoffSrc}).`,
+      ],
+      thresholdsSummary,
+    };
+  }
+  if (hrPct <= recoveryMax && distanceMi < 4 && durationMin <= recoveryMaxDur) {
+    return {
+      tag: tagOf("recovery"),
+      reasons: [
+        hrLine,
+        `${hrPct.toFixed(0)}% ≤ recovery cap ${recoveryMax.toFixed(0)}% (${cutoffSrc}).`,
+        `Distance ${distanceMi.toFixed(1)} mi < 4 mi and duration ${durationMin.toFixed(0)} min ≤ ${recoveryMaxDur.toFixed(0)} min.`,
+      ],
+      thresholdsSummary,
+    };
+  }
+  return {
+    tag: tagOf("easy"),
+    reasons: [
+      hrLine,
+      `${hrPct.toFixed(0)}% in easy band ${fmtPctRange(recoveryMax, tempoMin)} (${cutoffSrc}).`,
+    ],
+    thresholdsSummary,
+  };
 }
+
+export function classifyRun(input: ClassifyInput): RunTag {
+  return classifyRunWithReason(input).tag;
+}
+
 
 /** Returns the tag definition by id (useful for static color/label lookups). */
 export function getTagDefinition(id: RunTagId): RunTag {

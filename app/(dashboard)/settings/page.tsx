@@ -35,7 +35,15 @@ export default async function SettingsPage({
   const timezones = getTimezones();
   const user = await prisma().user.findUnique({
     where: { id: userId },
-    select: { email: true, firstName: true, lastName: true, timezone: true },
+    select: {
+      email: true,
+      firstName: true,
+      lastName: true,
+      timezone: true,
+      hrMaxBpm: true,
+      hrRestBpm: true,
+      hrZoneScheme: true,
+    },
   });
   const tz = normalizeUserTimezone(user?.timezone);
   const strava = await prisma().connectedAccount.findUnique({
@@ -508,6 +516,75 @@ export default async function SettingsPage({
               ) : null}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Heart rate zones</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-stone-600">
+            We compute time-in-zone for each Strava run from the activity HR stream
+            against your max HR. Set your max HR (e.g. 220 - age, or your highest
+            observed value). If you leave Resting HR blank, we’ll automatically use
+            your latest WHOOP resting HR (when connected).
+          </p>
+          <form
+            action="/api/settings/hr-profile"
+            method="post"
+            className="mt-4 grid gap-3 sm:grid-cols-3"
+          >
+            <label className="block">
+              <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                Max HR (bpm)
+              </div>
+              <input
+                name="hrMaxBpm"
+                type="number"
+                min={120}
+                max={230}
+                placeholder="e.g. 190"
+                defaultValue={user?.hrMaxBpm ?? ""}
+                className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+              />
+            </label>
+            <label className="block">
+              <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                Resting HR (bpm)
+              </div>
+              <input
+                name="hrRestBpm"
+                type="number"
+                min={30}
+                max={110}
+                placeholder="optional"
+                defaultValue={user?.hrRestBpm ?? ""}
+                className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+              />
+            </label>
+            <label className="block">
+              <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
+                Zone scheme
+              </div>
+              <select
+                name="hrZoneScheme"
+                defaultValue={user?.hrZoneScheme ?? "percent_max"}
+                className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+              >
+                <option value="percent_max">Percent of max HR (50/60/70/80/90)</option>
+                <option value="percent_threshold">Percent of threshold HR</option>
+              </select>
+            </label>
+            <div className="sm:col-span-3">
+              <button className="inline-flex h-10 items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800">
+                Save HR profile
+              </button>
+              <span className="ml-3 text-xs text-stone-500">
+                Saving recomputes cached zones for your runs.
+              </span>
+            </div>
+          </form>
         </CardContent>
       </Card>
 
