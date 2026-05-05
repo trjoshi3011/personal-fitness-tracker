@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  Apple,
   CalendarDays,
   Dumbbell,
   Gauge,
@@ -21,6 +22,7 @@ const navItems = [
   { href: "/lifting", label: "Lifting", icon: Dumbbell },
   { href: "/training", label: "Training", icon: CalendarDays },
   { href: "/recovery", label: "Recovery", icon: HeartPulse },
+  { href: "/nutrition", label: "Nutrition", icon: Apple },
   { href: "/insights", label: "Insights", icon: LineChart },
   { href: "/journey", label: "Journey", icon: TrendingUp },
   { href: "/settings", label: "Settings", icon: Settings },

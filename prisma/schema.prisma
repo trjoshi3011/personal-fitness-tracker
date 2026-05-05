@@ -25,6 +25,13 @@ enum LiftSessionTemplate {
   LEGS
 }
 
+/// Where a daily nutrition row came from. Manual rows take precedence over
+/// backfill on the same calendar day when building the unified history.
+enum NutritionSource {
+  BACKFILL
+  MANUAL
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -44,6 +51,16 @@ model User {
   hrRestBpm    Int?
   hrZoneScheme String  @default("percent_max")
 
+  /// Body profile used for BMR (Mifflin–St Jeor) on the Nutrition page.
+  /// Auto-populated from Apple Health <Me> + Height records on first upload,
+  /// editable via /api/nutrition/profile. `biologicalSex` is "MALE" | "FEMALE"
+  /// | "OTHER" — required for Mifflin–St Jeor; OTHER averages the male/female
+  /// constants. `heightCm` and `dateOfBirth` may be null until the user fills
+  /// them in (BMR is hidden until both are present).
+  heightCm      Float?
+  dateOfBirth   DateTime?
+  biologicalSex String?
+
   connectedAccounts   ConnectedAccount[]
   dailyFitbitStats         DailyFitbitStat[]
   dailyWhoopStats          DailyWhoopStat[]
@@ -59,6 +76,7 @@ model User {
   liftSessionLogs          LiftSessionLog[]
   liftSplitWeeklyTarget    LiftSplitWeeklyTarget?
   manualWeightLogs         ManualWeightLog[]
+  dailyNutritionLogs       DailyNutritionLog[]
 
   /// Last successful AI Coach (Gemini) JSON payload: { summary, sections, generatedAt }.
   aiCoachInsightsJson       Json?
@@ -89,6 +107,52 @@ model ManualWeightLog {
 
   @@unique([userId, date])
   @@index([userId, date])
+}
+
+/**
+ * Daily nutrition aggregates from either an Apple Health backfill (BACKFILL)
+ * or hand-entered rows (MANUAL). Composite uniqueness on (userId, date,
+ * source) lets a backfill row and a manual row coexist for the same day —
+ * MANUAL wins on read for the unified per-day view.
+ *
+ * Storing kcal + macros (g) directly avoids re-parsing the Apple Health XML
+ * every render. Each value is a daily SUM over all dietary records that fell
+ * on the user-timezone calendar day in the export.
+ */
+model DailyNutritionLog {
+  id     String @id @default(cuid())
+  userId String
+
+  /// User-timezone midnight stored as a UTC instant — same convention as
+  /// ManualWeightLog so day formatting matches across the app.
+  date    DateTime
+  source  NutritionSource
+
+  caloriesKcal    Float?
+  proteinG        Float?
+  carbsG          Float?
+  fatG            Float?
+  fiberG          Float?
+  sugarG          Float?
+  sodiumMg        Float?
+  saturatedFatG   Float?
+
+  /// Daily Apple Health "Active Energy Burned" total (kcal). Workout / movement
+  /// energy only — does **not** include BMR. We compute total burn elsewhere
+  /// as `BMR(weight, height, age, sex) + activeEnergyKcal`. Only ever populated
+  /// on BACKFILL rows (Apple Health is the source); MANUAL rows leave it null.
+  activeEnergyKcal Float?
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date, source])
+  @@index([userId, date])
+  @@index([userId, source, date])
 }
 
 /**

@@ -9,13 +9,15 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/overview") ||
     pathname.startsWith("/running") ||
     pathname.startsWith("/recovery") ||
+    pathname.startsWith("/nutrition") ||
     pathname.startsWith("/insights") ||
     pathname.startsWith("/journey") ||
     pathname.startsWith("/settings") ||
     pathname.startsWith("/api/strava") ||
     pathname.startsWith("/api/fitbit") ||
     pathname.startsWith("/api/whoop") ||
-    pathname.startsWith("/api/insights");
+    pathname.startsWith("/api/insights") ||
+    pathname.startsWith("/api/nutrition");
 
   if (!isProtected) return NextResponse.next();
 
@@ -49,6 +51,14 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  /**
+   * Exclude `/api/nutrition/upload` so Next.js does **not** clone the entire
+   * multipart body through middleware (Apple Health XML is often 200MB+). Auth
+   * still runs first inside the route handler via `requireUserId()` before
+   * `req.formData()` reads the file stream.
+   */
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|api/nutrition/upload).*)",
+  ],
 };
 
