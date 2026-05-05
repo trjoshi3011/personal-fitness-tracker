@@ -58,8 +58,37 @@ model User {
   trainingPlanWeeks        TrainingPlanWeek[]
   liftSessionLogs          LiftSessionLog[]
   liftSplitWeeklyTarget    LiftSplitWeeklyTarget?
+  manualWeightLogs         ManualWeightLog[]
+
+  /// Last successful AI Coach (Gemini) JSON payload: { summary, sections, generatedAt }.
+  aiCoachInsightsJson       Json?
+  aiCoachInsightsGeneratedAt DateTime?
 
   @@index([createdAt])
+}
+
+/**
+ * User-entered weight measurements. Used when WHOOP isn't connected (or as a
+ * supplement when the user has manual scale readings on days WHOOP didn't sync).
+ * One row per (userId, date). Manual entries take precedence over WHOOP for the
+ * same day when building the unified weight history.
+ */
+model ManualWeightLog {
+  id     String @id @default(cuid())
+  userId String
+
+  /// Day key (UTC midnight). Unique per user.
+  date     DateTime
+  weightKg Float
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }
 
 /**

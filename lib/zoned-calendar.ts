@@ -99,6 +99,73 @@ export function formatZonedDateKey(y: number, month1: number, day: number): stri
   return `${y}-${String(month1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/**
+ * Midnight on the user's calendar day that contains `d`. Use this when showing
+ * dates or merging samples so labels stay aligned with `User.timezone`.
+ */
+export function canonicalZonedDayStart(d: Date, tz: string): Date {
+  const p = localCalendarParts(d, tz);
+  return startOfZonedCalendarDay(p.y, p.m, p.d, tz);
+}
+
+/**
+ * Add signed **calendar** days in `tz` (handles month/year rollover and month
+ * length, including leap Februaries). Prefer this over `zonedDatePlusDays` when
+ * the span may cross DST transitions or you need exact calendar semantics.
+ */
+export function addCalendarDaysToZonedParts(
+  y: number,
+  month1: number,
+  day: number,
+  deltaDays: number,
+  tz: string,
+): { y: number; m: number; d: number } {
+  let cy = y;
+  let cm = month1;
+  let cd = day;
+  const step = deltaDays >= 0 ? 1 : -1;
+  const n = Math.abs(deltaDays);
+  for (let i = 0; i < n; i++) {
+    if (step > 0) {
+      cd += 1;
+      const dim = daysInZonedMonth(cy, cm, tz);
+      if (cd > dim) {
+        cd = 1;
+        cm += 1;
+        if (cm > 12) {
+          cm = 1;
+          cy += 1;
+        }
+      }
+    } else {
+      cd -= 1;
+      if (cd < 1) {
+        cm -= 1;
+        if (cm < 1) {
+          cm = 12;
+          cy -= 1;
+        }
+        cd = daysInZonedMonth(cy, cm, tz);
+      }
+    }
+  }
+  return { y: cy, m: cm, d: cd };
+}
+
+/** Advance `dayStartMs` by exactly one calendar day in `tz`. */
+export function nextZonedCalendarDayStartMs(dayStartMs: number, tz: string): number {
+  const p = localCalendarParts(new Date(dayStartMs), tz);
+  const nx = addCalendarDaysToZonedParts(p.y, p.m, p.d, 1, tz);
+  return startOfZonedCalendarDay(nx.y, nx.m, nx.d, tz).getTime();
+}
+
+/** Go back one calendar day from `dayStartMs` in `tz`. */
+export function prevZonedCalendarDayStartMs(dayStartMs: number, tz: string): number {
+  const p = localCalendarParts(new Date(dayStartMs), tz);
+  const pr = addCalendarDaysToZonedParts(p.y, p.m, p.d, -1, tz);
+  return startOfZonedCalendarDay(pr.y, pr.m, pr.d, tz).getTime();
+}
+
 /** Add calendar days in `tz` by shifting UTC ms (good enough for week grids). */
 export function zonedDatePlusDays(
   y: number,

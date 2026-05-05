@@ -27,6 +27,40 @@ export type AiInsightsResult = {
   generatedAt: string;
 };
 
+/** Validate JSON loaded from `User.aiCoachInsightsJson`. */
+export function parseCachedAiInsightsJson(
+  json: unknown,
+): AiInsightsResult | null {
+  if (json == null || typeof json !== "object") return null;
+  const o = json as Record<string, unknown>;
+  if (typeof o.summary !== "string" || !Array.isArray(o.sections)) return null;
+  const sections: InsightSection[] = [];
+  for (const raw of o.sections) {
+    if (raw == null || typeof raw !== "object") return null;
+    const s = raw as Record<string, unknown>;
+    const priority = s.priority;
+    if (
+      typeof s.emoji !== "string" ||
+      typeof s.title !== "string" ||
+      typeof s.body !== "string" ||
+      (priority !== "high" && priority !== "medium" && priority !== "low")
+    ) {
+      return null;
+    }
+    sections.push({
+      emoji: s.emoji,
+      title: s.title,
+      body: s.body,
+      priority,
+    });
+  }
+  const generatedAt =
+    typeof o.generatedAt === "string"
+      ? o.generatedAt
+      : new Date().toISOString();
+  return { summary: o.summary, sections, generatedAt };
+}
+
 const monthlySnapshotSelectBase = {
   year: true,
   month: true,

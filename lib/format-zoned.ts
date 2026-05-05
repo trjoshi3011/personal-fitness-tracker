@@ -2,6 +2,16 @@ import { startOfZonedCalendarDay } from "@/lib/zoned-calendar";
 
 export const ZONED_LOCALE = "en-US";
 
+/** `YYYY-MM-DD` for the calendar day containing `date` in `timeZone` (grouping / stable keys). */
+export function zonedDayKeyFromDate(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 export function formatZoned(
   date: Date,
   timeZone: string,

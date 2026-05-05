@@ -9,6 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
 } from "recharts";
 
 export type LineConfig = {
@@ -17,6 +18,15 @@ export type LineConfig = {
   name?: string;
   yAxisId?: string;
   unit?: string;
+  strokeDasharray?: string;
+  showDots?: boolean;
+};
+
+export type ReferenceLineConfig = {
+  /** x-axis category value (must match an x value present in `data`). */
+  x: string | number;
+  label?: string;
+  color?: string;
 };
 
 export function MultiLineChartView({
@@ -26,6 +36,8 @@ export function MultiLineChartView({
   height = 220,
   yDomain,
   rightYDomain,
+  referenceLines,
+  hideXTicks,
 }: {
   data: Record<string, unknown>[];
   xKey: string;
@@ -33,6 +45,8 @@ export function MultiLineChartView({
   height?: number;
   yDomain?: [number | "auto" | "dataMin", number | "auto" | "dataMax"];
   rightYDomain?: [number | "auto" | "dataMin", number | "auto" | "dataMax"];
+  referenceLines?: ReferenceLineConfig[];
+  hideXTicks?: boolean;
 }) {
   if (data.length === 0) {
     return (
@@ -54,9 +68,10 @@ export function MultiLineChartView({
         <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
         <XAxis
           dataKey={xKey}
-          tick={{ fontSize: 11, fill: "var(--chart-axis-text)" }}
+          tick={hideXTicks ? false : { fontSize: 11, fill: "var(--chart-axis-text)" }}
           tickLine={false}
           axisLine={false}
+          minTickGap={24}
         />
         <YAxis
           yAxisId="left"
@@ -89,6 +104,25 @@ export function MultiLineChartView({
           iconSize={10}
           iconType="circle"
         />
+        {referenceLines?.map((rl, i) => (
+          <ReferenceLine
+            key={`ref-${i}`}
+            x={rl.x}
+            yAxisId="left"
+            stroke={rl.color ?? "var(--chart-grid)"}
+            strokeDasharray="2 4"
+            label={
+              rl.label
+                ? {
+                    value: rl.label,
+                    position: "insideTopRight",
+                    fill: "var(--chart-axis-text)",
+                    fontSize: 10,
+                  }
+                : undefined
+            }
+          />
+        ))}
         {lines.map((l) => (
           <Line
             key={l.dataKey}
@@ -97,9 +131,14 @@ export function MultiLineChartView({
             name={l.name ?? l.dataKey}
             stroke={l.color}
             strokeWidth={2}
+            strokeDasharray={l.strokeDasharray}
             yAxisId={l.yAxisId ?? "left"}
-            dot={{ r: 2.5, fill: l.color, strokeWidth: 0 }}
-            activeDot={{ r: 4.5, strokeWidth: 0 }}
+            dot={
+              l.showDots === false
+                ? false
+                : { r: 2.5, fill: l.color, strokeWidth: 0 }
+            }
+            activeDot={l.showDots === false ? false : { r: 4.5, strokeWidth: 0 }}
             connectNulls
           />
         ))}

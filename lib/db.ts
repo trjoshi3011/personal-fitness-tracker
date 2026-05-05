@@ -33,8 +33,12 @@ function getPool() {
   return globalForPrisma.prismaPool;
 }
 
-/** If this model delegate is missing, the process is holding a pre-generate client. */
-const PRISMA_SCHEMA_MARKER = "dailyWhoopStat" as const;
+/**
+ * If this model delegate is missing, the process is holding a pre-generate
+ * client. Bump this to the *latest* added model whenever the schema gains a
+ * new one so dev HMR picks up the regenerated client without a manual restart.
+ */
+const PRISMA_SCHEMA_MARKER = "manualWeightLog" as const;
 
 function discardStalePrismaClient(client: PrismaClient) {
   void client.$disconnect().catch(() => {});
