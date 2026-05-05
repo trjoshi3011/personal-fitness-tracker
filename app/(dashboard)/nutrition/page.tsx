@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { BackfillUploadLazy } from "@/components/dashboard/nutrition/backfill-upload-lazy";
+import { NutritionAiInsightsLazy } from "@/components/dashboard/nutrition/ai-insights-dynamic";
 import { NutritionBelowFold } from "@/components/dashboard/nutrition/below-fold";
 import { NutritionBelowFoldSkeleton } from "@/components/dashboard/nutrition/below-fold-skeleton";
 import { prisma } from "@/lib/db";
@@ -63,6 +64,8 @@ export default async function NutritionPage({
       ) : null}
 
       <BackfillUploadLazy />
+
+      <NutritionAiInsightsLazy />
 
       <Suspense fallback={<NutritionBelowFoldSkeleton />}>
         <NutritionBelowFold userId={userId} tz={tz} todayIso={todayIso} />

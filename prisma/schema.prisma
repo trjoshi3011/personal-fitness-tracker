@@ -82,6 +82,10 @@ model User {
   aiCoachInsightsJson       Json?
   aiCoachInsightsGeneratedAt DateTime?
 
+  /// Last successful AI Nutrition insights (Gemini) JSON payload.
+  aiNutritionInsightsJson       Json?
+  aiNutritionInsightsGeneratedAt DateTime?
+
   @@index([createdAt])
 }
 

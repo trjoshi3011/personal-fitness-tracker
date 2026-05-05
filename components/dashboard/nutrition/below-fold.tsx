@@ -528,7 +528,7 @@ export async function NutritionBelowFold({
 
       <section className="grid gap-4 lg:grid-cols-5">
         {/* Manual entry form (3 cols) */}
-        <Card className="lg:col-span-3">
+        <Card className="lg:col-span-3 self-start">
           <CardHeader>
             <CardTitle>Log a day manually</CardTitle>
           </CardHeader>
@@ -589,7 +589,7 @@ export async function NutritionBelowFold({
         </Card>
 
         {/* Recent entries list (2 cols) */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 self-start">
           <CardHeader>
             <CardTitle>Recent entries</CardTitle>
           </CardHeader>

@@ -31,11 +31,18 @@ import {
   startOfZonedWeekMondayContaining,
 } from "@/lib/zoned-calendar";
 import { projectWeight, type WeightSample } from "@/lib/weight-projection";
+import {
+  ageYearsAt,
+  buildPerDayWeightKg,
+  mifflinStJeorBmrKcal,
+  type BiologicalSex,
+} from "@/lib/nutrition-burn";
 
 const PROJECTION_WINDOW_DAYS = 60;
 const PROJECTION_HORIZON_DAYS = 28;
 /** Cap on `take:` for the unified manual-weight pull. 100 covers >1 entry/day for 60d. */
 const RECENT_MANUAL_LIMIT = 100;
+const MIN_TRUSTED_CONSUMED_KCAL = 900;
 
 function isoDay(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -116,6 +123,24 @@ export async function InsightsBelowFold({
     }),
   ]);
 
+  // Nutrition + profile inputs for deficit-aware weight projection.
+  const [nutritionRows, burnProfile] = await Promise.all([
+    prisma().dailyNutritionLog.findMany({
+      where: { userId, date: { gte: projectionStart } },
+      select: {
+        date: true,
+        source: true,
+        caloriesKcal: true,
+        activeEnergyKcal: true,
+      },
+      orderBy: { date: "asc" },
+    }),
+    prisma().user.findUnique({
+      where: { id: userId },
+      select: { heightCm: true, dateOfBirth: true, biologicalSex: true },
+    }),
+  ]);
+
   /** 30-day slices derived from the single 60-day WHOOP pull. */
   const whoop30 = whoop60.filter(
     (r) => r.date.getTime() >= startMs && r.date.getTime() <= endMs,
@@ -193,15 +218,83 @@ export async function InsightsBelowFold({
     (a, b) => a.date.getTime() - b.date.getTime(),
   );
 
+  // Build per-day deficit (kcal) keyed by the same dayStartMs we pass to projectWeight.
+  const toDayStartMs = (d: Date) => canonicalZonedDayStart(d, tz).getTime();
+  const weightHistoryForBurn = mergedWeightHistory.map((s) => ({
+    date: s.date,
+    weightKg: s.kg,
+  }));
+  const todayStartMs = toDayStartMs(now);
+  const weightByDayMs = buildPerDayWeightKg({
+    history: weightHistoryForBurn,
+    startDayMs: toDayStartMs(projectionStart),
+    endDayMs: todayStartMs,
+    dayStartMs: (d) => toDayStartMs(d),
+    advanceCalendarDayMs: (ms) => nextZonedCalendarDayStartMs(ms, tz),
+  });
+
+  const sex: BiologicalSex | null =
+    burnProfile?.biologicalSex === "MALE" ||
+    burnProfile?.biologicalSex === "FEMALE" ||
+    burnProfile?.biologicalSex === "OTHER"
+      ? (burnProfile.biologicalSex as BiologicalSex)
+      : null;
+  const heightCm = burnProfile?.heightCm ?? null;
+  const dob = burnProfile?.dateOfBirth ?? null;
+  const burnReady = heightCm != null && dob != null && sex != null && weightByDayMs.size > 0;
+
+  // Merge MANUAL-over-BACKFILL for consumed calories per day, and read activeEnergy separately.
+  const consumedByDay = new Map<number, number>();
+  const activeByDay = new Map<number, number>();
+  const bestSourceByDay = new Map<number, "BACKFILL" | "MANUAL">();
+  for (const r of nutritionRows) {
+    const dayMs = toDayStartMs(r.date);
+    if (r.activeEnergyKcal != null && r.activeEnergyKcal > 0) {
+      activeByDay.set(dayMs, r.activeEnergyKcal);
+    }
+    if (r.caloriesKcal == null || !Number.isFinite(r.caloriesKcal)) continue;
+    const existingSrc = bestSourceByDay.get(dayMs);
+    if (!existingSrc) {
+      bestSourceByDay.set(dayMs, r.source);
+      consumedByDay.set(dayMs, r.caloriesKcal);
+    } else if (r.source === "MANUAL" && existingSrc !== "MANUAL") {
+      bestSourceByDay.set(dayMs, r.source);
+      consumedByDay.set(dayMs, r.caloriesKcal);
+    }
+  }
+
+  const deficitByDayMs = new Map<number, number>();
+  if (burnReady) {
+    for (const [dayMs, consumed] of consumedByDay) {
+      if (!(consumed > MIN_TRUSTED_CONSUMED_KCAL)) continue;
+      const weight = weightByDayMs.get(dayMs) ?? null;
+      const ageY = dob ? ageYearsAt(dob, new Date(dayMs)) : null;
+      const bmr =
+        weight != null && ageY != null
+          ? mifflinStJeorBmrKcal({
+              weightKg: weight,
+              heightCm: heightCm!,
+              ageYears: ageY,
+              sex: sex!,
+            })
+          : null;
+      const active = activeByDay.get(dayMs) ?? 0;
+      if (bmr == null) continue;
+      const totalBurn = bmr + active;
+      deficitByDayMs.set(dayMs, consumed - totalBurn);
+    }
+  }
+
   const projection = projectWeight({
     history: mergedWeightHistory,
     horizonDays: PROJECTION_HORIZON_DAYS,
     fitWindowDays: PROJECTION_WINDOW_DAYS,
     formatDate: shortDate,
     now,
-    toDayStartMs: (d) => canonicalZonedDayStart(d, tz).getTime(),
+    toDayStartMs,
     advanceCalendarDayMs: (ms) => nextZonedCalendarDayStartMs(ms, tz),
     retreatCalendarDayMs: (ms) => prevZonedCalendarDayStartMs(ms, tz),
+    energyBalanceKcalByDayMs: deficitByDayMs,
   });
 
   /**

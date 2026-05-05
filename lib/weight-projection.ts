@@ -122,6 +122,15 @@ export function projectWeight(args: {
   formatDate: (d: Date) => string;
   now?: Date;
   /**
+   * Optional per-day energy balance (kcal) keyed by the same dayStartMs that
+   * `toDayStartMs` returns. Negative = deficit, positive = surplus.
+   *
+   * When present, we blend the weight-regression slope with the implied
+   * slope from energy balance (\(\Delta kg/day \approx kcal/7700\)) to reduce
+   * lag and better reflect recent diet-driven change.
+   */
+  energyBalanceKcalByDayMs?: Map<number, number>;
+  /**
    * Maps any Date to the absolute UTC instant that represents the start of
    * its calendar day in whatever frame the caller cares about (typically the
    * user's IANA timezone). Defaults to UTC midnight. Used as the dedupe key
@@ -219,6 +228,54 @@ export function projectWeight(args: {
       ssTot += (ys[i] - meanY) ** 2;
     }
     rSquared = ssTot === 0 ? 0 : Math.max(0, 1 - ssRes / ssTot);
+  }
+
+  // --- Optional: blend in deficit-derived slope ---
+  const energy = args.energyBalanceKcalByDayMs;
+  if (energy && energy.size > 0) {
+    // Compute mean daily energy balance over days that overlap the fit window.
+    let sum = 0;
+    let cnt = 0;
+    for (const [dMs] of fitDays) {
+      const v = energy.get(dMs);
+      if (typeof v === "number" && Number.isFinite(v)) {
+        sum += v;
+        cnt += 1;
+      }
+    }
+    // If no overlap, use the most recent up-to-14 entries from the map.
+    if (cnt === 0) {
+      const recent = [...energy.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .slice(-14);
+      for (const [, v] of recent) {
+        if (typeof v === "number" && Number.isFinite(v)) {
+          sum += v;
+          cnt += 1;
+        }
+      }
+    }
+
+    if (cnt > 0) {
+      const meanKcal = sum / cnt;
+      const deficitSlopeKgPerDay = meanKcal / 7700;
+      const clippedDeficitSlope = Math.max(
+        -SAFE_RATE_KG_PER_DAY,
+        Math.min(SAFE_RATE_KG_PER_DAY, deficitSlopeKgPerDay),
+      );
+
+      // Weight slope trust increases with fit quality.
+      const weightTrust = hasTrend
+        ? Math.max(0.35, Math.min(0.85, rSquared))
+        : 0;
+      const blended = slope * weightTrust + clippedDeficitSlope * (1 - weightTrust);
+      slope = blended;
+
+      // Keep the same "re-anchor to the most recent point" behavior.
+      const lastX = xs[n - 1] ?? 0;
+      const lastY = ys[n - 1] ?? intercept;
+      intercept = lastY - slope * lastX;
+    }
   }
 
   const todayDayMs = toDayStartMs(now);
