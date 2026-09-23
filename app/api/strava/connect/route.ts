@@ -16,10 +16,16 @@ export async function GET(req: Request) {
       maxAge: 10 * 60, // 10 minutes
     });
 
-    // Prefer env override, otherwise derive from current origin (helps when dev port changes).
+    // Prefer the current request origin locally so a stale port in .env
+    // (e.g. :3002 while the app is on :3000) cannot break the OAuth return.
     const origin = new URL(req.url).origin;
-    const redirectUri =
-      process.env.STRAVA_REDIRECT_URI ?? `${origin}/api/strava/callback`;
+    const envRedirect = process.env.STRAVA_REDIRECT_URI;
+    const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(
+      origin,
+    );
+    const redirectUri = isLocalhost
+      ? `${origin}/api/strava/callback`
+      : (envRedirect ?? `${origin}/api/strava/callback`);
 
     const url = getStravaAuthorizeUrl({ state, redirectUri });
     return NextResponse.redirect(url);

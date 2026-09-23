@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { recomputeMonthlyFitnessSnapshots } from "@/lib/monthly-snapshots";
 import { MAX_STRAVA_SYNC_DAYS } from "@/lib/sync-constants";
+import { formatStravaApiError } from "@/lib/strava";
 
 type StravaActivityApi = {
   id: number;
@@ -41,11 +42,7 @@ async function fetchActivitiesPage(
 
   const json = (await res.json().catch(() => null)) as StravaActivityApi[] | null;
   if (!res.ok || !json) {
-    const message =
-      typeof (json as any)?.message === "string"
-        ? (json as any).message
-        : `Strava activities fetch failed (${res.status})`;
-    throw new Error(message);
+    throw new Error(formatStravaApiError(json, res.status));
   }
   return json;
 }

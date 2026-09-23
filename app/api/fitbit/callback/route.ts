@@ -49,8 +49,12 @@ export async function GET(req: Request) {
   }
 
   const origin = url.origin;
-  const redirectUri =
-    process.env.FITBIT_REDIRECT_URI ?? `${origin}/api/fitbit/callback`;
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(
+    origin,
+  );
+  const redirectUri = isLocalhost
+    ? `${origin}/api/fitbit/callback`
+    : (process.env.FITBIT_REDIRECT_URI ?? `${origin}/api/fitbit/callback`);
 
   try {
     const token = await exchangeFitbitCodeForTokens(code, redirectUri);

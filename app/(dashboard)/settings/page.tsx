@@ -85,9 +85,11 @@ export default async function SettingsPage({
   const isConnected = Boolean(strava?.isActive);
   const fitbitConnected = Boolean(fitbit?.isActive);
   const whoopConnected = Boolean(whoop?.isActive);
+  // Returns null when the token is expired/revoked (e.g. Strava Forbidden).
   const recentActivities = isConnected
     ? await getRecentStravaActivities({ days: 30, perPage: 5 })
     : null;
+  const stravaNeedsReconnect = isConnected && recentActivities === null;
 
   const recentFitbitDays =
     fitbitConnected
@@ -176,7 +178,10 @@ export default async function SettingsPage({
             </p>
           ) : null}
           {sp.stravaSync === "error" ? (
-            <p className="text-[color:var(--ui-danger)]">Strava sync failed.</p>
+            <p className="text-[color:var(--ui-danger)]">
+              Strava sync failed
+              {sp.reason ? `: ${sp.reason}` : "."}
+            </p>
           ) : null}
           {sp.stravaSync === "not_connected" ? (
             <p className="text-[color:var(--ui-danger)]">Connect Strava before syncing.</p>
@@ -188,7 +193,10 @@ export default async function SettingsPage({
             </p>
           ) : null}
           {sp.fitbitSync === "error" ? (
-            <p className="text-[color:var(--ui-danger)]">Fitbit sync failed.</p>
+            <p className="text-[color:var(--ui-danger)]">
+              Fitbit sync failed
+              {sp.reason ? `: ${sp.reason}` : "."}
+            </p>
           ) : null}
           {sp.fitbitSync === "not_connected" ? (
             <p className="text-[color:var(--ui-danger)]">Connect Fitbit before syncing.</p>
@@ -204,7 +212,10 @@ export default async function SettingsPage({
             </p>
           ) : null}
           {sp.whoopSync === "error" ? (
-            <p className="text-[color:var(--ui-danger)]">WHOOP sync failed.</p>
+            <p className="text-[color:var(--ui-danger)]">
+              WHOOP sync failed
+              {sp.reason ? `: ${sp.reason}` : "."}
+            </p>
           ) : null}
           {sp.whoopSync === "not_connected" ? (
             <p className="text-[color:var(--ui-danger)]">Connect WHOOP before syncing.</p>
@@ -237,7 +248,9 @@ export default async function SettingsPage({
               <div className="text-sm font-medium text-stone-900">Strava</div>
               <div className="mt-1 text-sm text-stone-500">
                 {isConnected
-                  ? `Connected (athlete ${strava?.providerAccountId})`
+                  ? stravaNeedsReconnect
+                    ? "Connected, but Strava API rejected requests — if sync says the app is Inactive, reactivate it at strava.com/settings/api (requires a Strava subscription on the app owner account)"
+                    : `Connected (athlete ${strava?.providerAccountId})`
                   : "Not connected"}
               </div>
               {isConnected ? (
@@ -248,12 +261,12 @@ export default async function SettingsPage({
               ) : null}
             </div>
             <div className="flex items-center gap-2">
-              <Link
+              <a
                 href="/api/strava/connect"
                 className="inline-flex h-9 items-center justify-center rounded-xl bg-[color:var(--ui-accent)] px-4 text-sm font-medium text-[color:var(--color-text-inverse)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--ui-accent)_88%,#000)]"
               >
                 {isConnected ? "Reconnect Strava" : "Connect Strava"}
-              </Link>
+              </a>
               {isConnected ? (
                 <form action="/api/strava/sync?days=90" method="post">
                   <button className="inline-flex h-9 items-center justify-center rounded-xl border border-[color:var(--color-border-default)] bg-card/75 px-4 text-sm font-medium text-[color:var(--color-text-secondary)] transition-all hover:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)]">
@@ -293,7 +306,9 @@ export default async function SettingsPage({
                   </ul>
                 ) : (
                   <div className="mt-3 text-sm text-stone-500">
-                    No recent activities found (or missing permissions).
+                    {stravaNeedsReconnect
+                      ? "Could not load activities from Strava. Use Reconnect Strava above."
+                      : "No recent activities found (or missing permissions)."}
                   </div>
                 )}
               </div>
@@ -319,12 +334,12 @@ export default async function SettingsPage({
                 ) : null}
               </div>
               <div className="flex items-center gap-2">
-                <Link
+                <a
                   href="/api/fitbit/connect"
                   className="inline-flex h-9 items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800"
                 >
                   {fitbitConnected ? "Reconnect Fitbit" : "Connect Fitbit"}
-                </Link>
+                </a>
                 {fitbitConnected ? (
                   <form action="/api/fitbit/sync?days=90" method="post">
                     <button className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-900/15 bg-card/75 px-4 text-sm font-medium text-stone-700 transition-all hover:border-orange-500/40 hover:bg-orange-50/75 hover:text-orange-700">
@@ -399,12 +414,12 @@ export default async function SettingsPage({
                 ) : null}
               </div>
               <div className="flex items-center gap-2">
-                <Link
+                <a
                   href="/api/whoop/connect"
                   className="inline-flex h-9 items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800"
                 >
                   {whoopConnected ? "Reconnect WHOOP" : "Connect WHOOP"}
-                </Link>
+                </a>
                 {whoopConnected ? (
                   <form action="/api/whoop/sync?days=90" method="post">
                     <button className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-900/15 bg-card/75 px-4 text-sm font-medium text-stone-700 transition-all hover:border-orange-500/40 hover:bg-orange-50/75 hover:text-orange-700">

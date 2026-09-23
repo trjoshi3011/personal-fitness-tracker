@@ -234,10 +234,10 @@ export default async function OverviewPage({
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Distance" value={`${miles.toFixed(1)} mi`} hint="Strava · 7d" />
-        <StatCard title="Time" value={secondsToHhMm(totalSeconds)} hint="Strava · 7d" />
-        <StatCard title="Avg pace" value={pace} hint="Strava · 7d" />
-        <StatCard title="Runs" value={String(activities7.length)} hint="Strava · 7d" />
+        <StatCard title="Distance" value={`${miles.toFixed(1)} mi`} hint="Runs · 7d" />
+        <StatCard title="Time" value={secondsToHhMm(totalSeconds)} hint="Runs · 7d" />
+        <StatCard title="Avg pace" value={pace} hint="Runs · 7d" />
+        <StatCard title="Runs" value={String(activities7.length)} hint="Runs · 7d" />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -261,7 +261,7 @@ export default async function OverviewPage({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3">
-        <ChartCard title="Distance by day" description="Miles from Strava runs · 7d" className="lg:col-span-2">
+        <ChartCard title="Distance by day" description="Miles from WHOOP / Fitbit / Strava runs · 7d" className="lg:col-span-2">
           <BarChartView data={distData} xKey="day" yKey="mi" color={chartPalette.amazon} yUnit=" mi" />
         </ChartCard>
         <CombinedMonthCalendar

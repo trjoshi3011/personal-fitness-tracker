@@ -16,8 +16,13 @@ export async function GET(req: Request) {
     });
 
     const origin = new URL(req.url).origin;
-    const redirectUri =
-      process.env.WHOOP_REDIRECT_URI ?? `${origin}/api/whoop/callback`;
+    const envRedirect = process.env.WHOOP_REDIRECT_URI;
+    const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(
+      origin,
+    );
+    const redirectUri = isLocalhost
+      ? `${origin}/api/whoop/callback`
+      : (envRedirect ?? `${origin}/api/whoop/callback`);
 
     const url = getWhoopAuthorizeUrl({ state, redirectUri });
     return NextResponse.redirect(url);

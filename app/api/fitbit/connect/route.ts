@@ -16,8 +16,13 @@ export async function GET(req: Request) {
     });
 
     const origin = new URL(req.url).origin;
-    const redirectUri =
-      process.env.FITBIT_REDIRECT_URI ?? `${origin}/api/fitbit/callback`;
+    const envRedirect = process.env.FITBIT_REDIRECT_URI;
+    const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(
+      origin,
+    );
+    const redirectUri = isLocalhost
+      ? `${origin}/api/fitbit/callback`
+      : (envRedirect ?? `${origin}/api/fitbit/callback`);
 
     const url = getFitbitAuthorizeUrl({ state, redirectUri });
     return NextResponse.redirect(url);

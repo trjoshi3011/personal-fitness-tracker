@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
+import { fetchAllMergedRunTableRows } from "@/lib/merged-runs";
 
-type StravaMonthRow = {
+type RunMonthRow = {
   year: number;
   month: number;
   runCount: number;
@@ -30,49 +31,60 @@ type WhoopMonthRow = {
   whoopDaysCount: number;
 };
 
+function aggregateRunsByMonth(
+  runs: Awaited<ReturnType<typeof fetchAllMergedRunTableRows>>,
+): RunMonthRow[] {
+  const map = new Map<
+    string,
+    {
+      year: number;
+      month: number;
+      runCount: number;
+      runDistanceMeters: number;
+      runMovingTimeSec: number;
+      runElevGainM: number;
+    }
+  >();
+
+  for (const r of runs) {
+    const year = r.startAt.getUTCFullYear();
+    const month = r.startAt.getUTCMonth() + 1;
+    const key = `${year}-${month}`;
+    const cur = map.get(key) ?? {
+      year,
+      month,
+      runCount: 0,
+      runDistanceMeters: 0,
+      runMovingTimeSec: 0,
+      runElevGainM: 0,
+    };
+    cur.runCount += 1;
+    cur.runDistanceMeters += r.distanceMeters ?? 0;
+    cur.runMovingTimeSec += r.movingTimeSec ?? 0;
+    cur.runElevGainM += r.totalElevationM ?? 0;
+    map.set(key, cur);
+  }
+
+  return [...map.values()].map((r) => ({
+    year: r.year,
+    month: r.month,
+    runCount: r.runCount,
+    runDistanceMeters: Math.round(r.runDistanceMeters),
+    runMovingTimeSec: Math.round(r.runMovingTimeSec),
+    runElevGainM: r.runElevGainM > 0 ? r.runElevGainM : null,
+    avgPaceSecPerMi:
+      r.runDistanceMeters > 0
+        ? (r.runMovingTimeSec / r.runDistanceMeters) * 1609.344
+        : null,
+  }));
+}
+
 /**
- * Rebuilds monthly rollups from raw Strava + Fitbit rows (full replace per user).
+ * Rebuilds monthly rollups from deduped WHOOP + Fitbit + Strava runs (full replace per user).
  * Call after sync so long-term / journey views stay fast and accurate.
  */
 export async function recomputeMonthlyFitnessSnapshots(userId: string) {
-  const stravaRows = await prisma().$queryRaw<StravaMonthRow[]>`
-    WITH combined AS (
-      SELECT
-        "startAt",
-        "distanceMeters",
-        "movingTimeSec",
-        "totalElevationM" AS elev
-      FROM "StravaActivity"
-      WHERE "userId" = ${userId}
-        AND ("type" = 'Run' OR "sportType" = 'Run')
-      UNION ALL
-      SELECT
-        "startAt",
-        "distanceMeters",
-        CASE
-          WHEN "durationMs" IS NOT NULL
-          THEN ROUND("durationMs" / 1000.0)::int
-          ELSE NULL
-        END AS "movingTimeSec",
-        "elevationGainM" AS elev
-      FROM "FitbitActivityLog"
-      WHERE "userId" = ${userId}
-    )
-    SELECT
-      EXTRACT(YEAR FROM "startAt")::int AS year,
-      EXTRACT(MONTH FROM "startAt")::int AS month,
-      COUNT(*)::int AS "runCount",
-      COALESCE(SUM("distanceMeters"), 0)::int AS "runDistanceMeters",
-      COALESCE(SUM("movingTimeSec"), 0)::int AS "runMovingTimeSec",
-      SUM(elev)::float AS "runElevGainM",
-      CASE
-        WHEN COALESCE(SUM("distanceMeters"), 0) > 0
-        THEN (SUM("movingTimeSec")::float / SUM("distanceMeters")::float) * 1609.344
-        ELSE NULL
-      END AS "avgPaceSecPerMi"
-    FROM combined
-    GROUP BY 1, 2
-  `;
+  const runRows = aggregateRunsByMonth(await fetchAllMergedRunTableRows(userId));
 
   const fitbitRows = await prisma().$queryRaw<FitbitMonthRow[]>`
     SELECT
@@ -102,8 +114,8 @@ export async function recomputeMonthlyFitnessSnapshots(userId: string) {
     GROUP BY 1, 2
   `;
 
-  const stravaMap = new Map(
-    stravaRows.map((r) => [`${r.year}-${r.month}`, r] as const),
+  const runMap = new Map(
+    runRows.map((r) => [`${r.year}-${r.month}`, r] as const),
   );
   const fitbitMap = new Map(
     fitbitRows.map((r) => [`${r.year}-${r.month}`, r] as const),
@@ -112,20 +124,20 @@ export async function recomputeMonthlyFitnessSnapshots(userId: string) {
     whoopRows.map((r) => [`${r.year}-${r.month}`, r] as const),
   );
   const keys = new Set([
-    ...stravaMap.keys(),
+    ...runMap.keys(),
     ...fitbitMap.keys(),
     ...whoopMap.keys(),
   ]);
 
   const records = [...keys].map((key) => {
     const [y, m] = key.split("-").map(Number);
-    const s = stravaMap.get(key);
+    const s = runMap.get(key);
     const f = fitbitMap.get(key);
     const w = whoopMap.get(key);
     return {
       userId,
-      year: y,
-      month: m,
+      year: y!,
+      month: m!,
       runCount: s?.runCount ?? null,
       runDistanceMeters: s?.runDistanceMeters ?? null,
       runMovingTimeSec: s?.runMovingTimeSec ?? null,

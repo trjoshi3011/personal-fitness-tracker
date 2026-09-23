@@ -72,10 +72,21 @@ function distanceToMeters(
 ): number | null {
   if (distance == null || !Number.isFinite(distance)) return null;
   const u = (unit ?? "").toLowerCase();
-  if (u.includes("kilometer") || u === "km") return Math.round(distance * 1000);
-  if (u.includes("mile")) return Math.round(distance * 1609.344);
-  if (u.includes("meter") || u === "m") return Math.round(distance);
-  return Math.round(distance * 1000);
+  if (u.includes("kilometer") || u === "km") return toPgInt(distance * 1000);
+  if (u.includes("mile")) return toPgInt(distance * 1609.344);
+  if (u.includes("meter") || u === "m") return toPgInt(distance);
+  return toPgInt(distance * 1000);
+}
+
+/** Postgres INTEGER range; Fitbit sometimes returns IDs larger than 2^31-1. */
+const PG_INT_MIN = -2147483648;
+const PG_INT_MAX = 2147483647;
+
+function toPgInt(n: unknown): number | null {
+  if (typeof n !== "number" || !Number.isFinite(n)) return null;
+  const r = Math.round(n);
+  if (r < PG_INT_MIN || r > PG_INT_MAX) return null;
+  return r;
 }
 
 /**
@@ -162,24 +173,21 @@ export async function syncFitbitRunActivityLogs({
         const logId = a.logId;
         if (logId == null || !Number.isFinite(logId)) continue;
 
-        const durationMs =
+        const durationMs = toPgInt(
           typeof a.duration === "number" && Number.isFinite(a.duration)
-            ? Math.round(a.duration)
+            ? a.duration
             : typeof a.originalDuration === "number" &&
                 Number.isFinite(a.originalDuration)
-              ? Math.round(a.originalDuration)
-              : null;
+              ? a.originalDuration
+              : null,
+        );
 
         const distanceMeters = distanceToMeters(a.distance, a.distanceUnit);
         const elev =
           typeof a.elevationGain === "number" && Number.isFinite(a.elevationGain)
             ? a.elevationGain
             : null;
-        const avgHr =
-          typeof a.averageHeartRate === "number" &&
-          Number.isFinite(a.averageHeartRate)
-            ? Math.round(a.averageHeartRate)
-            : null;
+        const avgHr = toPgInt(a.averageHeartRate);
 
         await prisma().fitbitActivityLog.upsert({
           where: {
@@ -189,33 +197,27 @@ export async function syncFitbitRunActivityLogs({
             userId,
             logId: String(logId),
             activityName: a.activityName ?? null,
-            activityTypeId: a.activityTypeId ?? null,
+            activityTypeId: toPgInt(a.activityTypeId),
             startAt,
             durationMs,
             distanceMeters,
             elevationGainM: elev,
             averageHeartRateBpm: avgHr,
             maxHeartRateBpm: null,
-            calories:
-              typeof a.calories === "number" && Number.isFinite(a.calories)
-                ? Math.round(a.calories)
-                : null,
+            calories: toPgInt(a.calories),
             logType: typeof a.logType === "string" ? a.logType : null,
             rawPayload: a as object,
             sourceConnectedAccountId: connectedAccountId,
           },
           update: {
             activityName: a.activityName ?? null,
-            activityTypeId: a.activityTypeId ?? null,
+            activityTypeId: toPgInt(a.activityTypeId),
             startAt,
             durationMs,
             distanceMeters,
             elevationGainM: elev,
             averageHeartRateBpm: avgHr,
-            calories:
-              typeof a.calories === "number" && Number.isFinite(a.calories)
-                ? Math.round(a.calories)
-                : null,
+            calories: toPgInt(a.calories),
             logType: typeof a.logType === "string" ? a.logType : null,
             rawPayload: a as object,
             sourceConnectedAccountId: connectedAccountId,

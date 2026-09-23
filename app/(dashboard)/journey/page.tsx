@@ -1,5 +1,6 @@
 import { ChartCard } from "@/components/dashboard/chart-card";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { MilesSinceDate } from "@/components/dashboard/miles-since-date";
 import { BarChartView } from "@/components/charts/bar-chart";
 import { AreaChartView } from "@/components/charts/area-chart";
 import { MultiLineChartView } from "@/components/charts/multi-line-chart";
@@ -287,7 +288,7 @@ export default async function JourneyPage() {
               ? formatPaceMinPerMile(latest.avgPaceSecPerMi)
               : "—"
           }
-          hint="Strava · monthly weighted"
+          hint="Runs · monthly weighted"
         />
         <StatCard
           title="Sleep (avg)"
@@ -301,10 +302,19 @@ export default async function JourneyPage() {
         />
       </section>
 
+      <section>
+        <ChartCard
+          title="Miles since date"
+          description="Total run miles from your selected date through today"
+        >
+          <MilesSinceDate />
+        </ChartCard>
+      </section>
+
       <section className="grid gap-4 lg:grid-cols-2">
         <ChartCard
           title="Monthly run volume"
-          description="Strava runs · miles per calendar month"
+          description="Miles per calendar month (WHOOP / Fitbit / Strava)"
         >
           <BarChartView
             data={runMi}
@@ -317,7 +327,7 @@ export default async function JourneyPage() {
         </ChartCard>
         <ChartCard
           title="Average pace by month"
-          description="Strava · lower is faster"
+          description="Avg pace · lower is faster"
         >
           <AreaChartView
             data={paceMin}
@@ -411,7 +421,7 @@ export default async function JourneyPage() {
       <section>
         <ChartCard
           title="Year-over-year run volume"
-          description={`Strava · ${lastYear} vs ${thisYear} (same calendar month)`}
+          description={`Miles · ${lastYear} vs ${thisYear} (same calendar month)`}
         >
           <MultiLineChartView
             data={yoyData}

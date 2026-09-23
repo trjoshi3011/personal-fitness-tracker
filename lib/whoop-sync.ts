@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { recomputeMonthlyFitnessSnapshots } from "@/lib/monthly-snapshots";
 import {
   MAX_WHOOP_SYNC_DAYS,
+  WHOOP_API_CHUNK_DAYS,
   utcInclusiveWindowStart,
 } from "@/lib/sync-constants";
 
@@ -27,18 +28,39 @@ function isoToUserLocalUtcDate(iso: string, timeZone: string): Date {
 }
 
 export async function whoopDeveloperApiGet(path: string, accessToken: string) {
-  const res = await fetch(`${WHOOP_API}${path}`, {
-    headers: { authorization: `Bearer ${accessToken}` },
-  });
-  const json = (await res.json().catch(() => null)) as unknown;
-  if (!res.ok) {
-    const msg =
-      typeof (json as { message?: string })?.message === "string"
-        ? (json as { message: string }).message
-        : `WHOOP API request failed (${res.status})`;
-    throw new Error(msg);
+  const maxAttempts = 4;
+  let lastStatus = 0;
+  let lastJson: unknown = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const res = await fetch(`${WHOOP_API}${path}`, {
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    lastStatus = res.status;
+    lastJson = await res.json().catch(() => null);
+
+    if (res.status === 429 && attempt < maxAttempts) {
+      const retryAfterSec = Number(res.headers.get("retry-after"));
+      const waitMs =
+        Number.isFinite(retryAfterSec) && retryAfterSec > 0
+          ? Math.min(retryAfterSec * 1000, 30_000)
+          : Math.min(1000 * 2 ** (attempt - 1), 15_000);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+
+    if (!res.ok) {
+      const msg =
+        typeof (lastJson as { message?: string })?.message === "string"
+          ? (lastJson as { message: string }).message
+          : `WHOOP API request failed (${lastStatus})`;
+      throw new Error(msg);
+    }
+
+    return lastJson;
   }
-  return json;
+
+  throw new Error(`WHOOP API request failed (${lastStatus || 429})`);
 }
 
 type RecoveryRow = {
@@ -95,6 +117,63 @@ type WhoopWorkoutApiRecord = {
     zone_durations?: Record<string, number>;
   };
 };
+
+function sleepMs(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Inclusive UTC chunks covering [start, end]. */
+function* utcDateChunks(start: Date, end: Date, chunkDays: number) {
+  const days = Math.max(1, Math.floor(chunkDays));
+  let cursor = new Date(start.getTime());
+  while (cursor.getTime() < end.getTime()) {
+    const chunkEndMs = Math.min(
+      cursor.getTime() + days * 86_400_000,
+      end.getTime(),
+    );
+    const chunkEnd = new Date(chunkEndMs);
+    yield { start: new Date(cursor), end: chunkEnd };
+    cursor = chunkEnd;
+  }
+}
+
+/**
+ * Pull WHOOP workouts across a window in small chunks to avoid 429s.
+ * Safe to call independently of recovery sync.
+ */
+export async function syncWhoopWorkoutsChunked({
+  userId,
+  connectedAccountId,
+  accessToken,
+  windowStartAt,
+  windowEndAt,
+  chunkDays = WHOOP_API_CHUNK_DAYS,
+}: {
+  userId: string;
+  connectedAccountId: string;
+  accessToken: string;
+  windowStartAt: Date;
+  windowEndAt: Date;
+  chunkDays?: number;
+}): Promise<{ fetched: number; upserted: number }> {
+  let fetched = 0;
+  let upserted = 0;
+  let chunkIndex = 0;
+  for (const chunk of utcDateChunks(windowStartAt, windowEndAt, chunkDays)) {
+    if (chunkIndex > 0) await sleepMs(1200);
+    const w = await syncWhoopWorkoutsInWindow({
+      userId,
+      connectedAccountId,
+      accessToken,
+      startIso: chunk.start.toISOString(),
+      endIso: chunk.end.toISOString(),
+    });
+    fetched += w.fetched;
+    upserted += w.upserted;
+    chunkIndex += 1;
+  }
+  return { fetched, upserted };
+}
 
 async function syncWhoopWorkoutsInWindow({
   userId,
@@ -293,55 +372,24 @@ function shouldReplace(existing: DayAgg, incoming: DayAgg): boolean {
   return incoming.priority > existing.priority;
 }
 
-export async function syncWhoopDailyStats({
+async function syncWhoopRecoveryInWindow({
   userId,
   connectedAccountId,
   accessToken,
-  days,
+  tz,
+  startIso,
+  endIso,
+  cycleCache,
 }: {
   userId: string;
   connectedAccountId: string;
   accessToken: string;
-  days: number;
-}) {
-  const user = await prisma().user.findUnique({
-    where: { id: userId },
-    select: { timezone: true },
-  });
-  const tz = user?.timezone?.trim() || "UTC";
-
-  const daysClamped =
-    Number.isFinite(days) && days > 0
-      ? Math.min(days, MAX_WHOOP_SYNC_DAYS)
-      : 90;
-
-  const windowEndAt = new Date();
-  const windowStartAt = utcInclusiveWindowStart(windowEndAt, daysClamped);
-
-  const startIso = windowStartAt.toISOString();
-  const endIso = windowEndAt.toISOString();
-
-  let profileWeightKg: number | null = null;
-  try {
-    const body = (await whoopDeveloperApiGet(
-      "/v2/user/measurement/body",
-      accessToken,
-    )) as { weight_kilogram?: number };
-    if (
-      typeof body.weight_kilogram === "number" &&
-      Number.isFinite(body.weight_kilogram) &&
-      body.weight_kilogram > 0
-    ) {
-      profileWeightKg = body.weight_kilogram;
-    }
-  } catch {
-    // Missing read:body_measurement scope or API error — leave weight null
-  }
-
-  const cycleCache = new Map<number, CycleRow>();
-
+  tz: string;
+  startIso: string;
+  endIso: string;
+  cycleCache: Map<number, CycleRow>;
+}): Promise<{ fetched: number; upserted: number }> {
   const map = new Map<string, DayAgg>();
-
   let nextToken: string | undefined;
   let fetched = 0;
 
@@ -376,6 +424,9 @@ export async function syncWhoopDailyStats({
 
       if (sleep.score_state && sleep.score_state !== "SCORED") continue;
       if (!sleep.end) continue;
+
+      // Pace recovery API calls — sleep+cycle per recovery trips rate limits fast.
+      await sleepMs(150);
 
       const dayDate = isoToUserLocalUtcDate(sleep.end, tz);
       const dayKey = dayDate.toISOString().slice(0, 10);
@@ -499,6 +550,140 @@ export async function syncWhoopDailyStats({
     upserted += 1;
   }
 
+  return { fetched, upserted };
+}
+
+/**
+ * Pull WHOOP recovery/sleep/strain day rows in small chunks to avoid 429s.
+ */
+export async function syncWhoopRecoveryChunked({
+  userId,
+  connectedAccountId,
+  accessToken,
+  tz,
+  windowStartAt,
+  windowEndAt,
+  chunkDays = 7,
+}: {
+  userId: string;
+  connectedAccountId: string;
+  accessToken: string;
+  tz: string;
+  windowStartAt: Date;
+  windowEndAt: Date;
+  chunkDays?: number;
+}): Promise<{ fetched: number; upserted: number }> {
+  const cycleCache = new Map<number, CycleRow>();
+  let fetched = 0;
+  let upserted = 0;
+  let chunkIndex = 0;
+  for (const chunk of utcDateChunks(windowStartAt, windowEndAt, chunkDays)) {
+    if (chunkIndex > 0) await sleepMs(2500);
+    try {
+      const r = await syncWhoopRecoveryInWindow({
+        userId,
+        connectedAccountId,
+        accessToken,
+        tz,
+        startIso: chunk.start.toISOString(),
+        endIso: chunk.end.toISOString(),
+        cycleCache,
+      });
+      fetched += r.fetched;
+      upserted += r.upserted;
+      console.log(
+        `[whoop-recovery] chunk ${chunk.start.toISOString().slice(0, 10)} → ${chunk.end.toISOString().slice(0, 10)} fetched=${r.fetched} upserted=${r.upserted}`,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(
+        `[whoop-recovery] chunk failed ${chunk.start.toISOString().slice(0, 10)}: ${msg}`,
+      );
+      // Continue remaining chunks even if one hits a transient 429.
+      await sleepMs(5000);
+    }
+    chunkIndex += 1;
+  }
+  return { fetched, upserted };
+}
+
+export async function syncWhoopDailyStats({
+  userId,
+  connectedAccountId,
+  accessToken,
+  days,
+}: {
+  userId: string;
+  connectedAccountId: string;
+  accessToken: string;
+  days: number;
+}) {
+  const user = await prisma().user.findUnique({
+    where: { id: userId },
+    select: { timezone: true },
+  });
+  const tz = user?.timezone?.trim() || "UTC";
+
+  const daysClamped =
+    Number.isFinite(days) && days > 0
+      ? Math.min(days, MAX_WHOOP_SYNC_DAYS)
+      : 90;
+
+  const windowEndAt = new Date();
+  const windowStartAt = utcInclusiveWindowStart(windowEndAt, daysClamped);
+
+  // Workouts first (lighter API). Chunked so summer history can backfill without 429.
+  let workoutsFetched = 0;
+  let workoutsUpserted = 0;
+  try {
+    const w = await syncWhoopWorkoutsChunked({
+      userId,
+      connectedAccountId,
+      accessToken,
+      windowStartAt,
+      windowEndAt,
+    });
+    workoutsFetched = w.fetched;
+    workoutsUpserted = w.upserted;
+  } catch {
+    // Missing read:workout scope or temporary API error — recovery sync may still succeed.
+  }
+
+  let profileWeightKg: number | null = null;
+  try {
+    const body = (await whoopDeveloperApiGet(
+      "/v2/user/measurement/body",
+      accessToken,
+    )) as { weight_kilogram?: number };
+    if (
+      typeof body.weight_kilogram === "number" &&
+      Number.isFinite(body.weight_kilogram) &&
+      body.weight_kilogram > 0
+    ) {
+      profileWeightKg = body.weight_kilogram;
+    }
+  } catch {
+    // Missing read:body_measurement scope or API error — leave weight null
+  }
+
+  let fetched = 0;
+  let upserted = 0;
+  try {
+    const r = await syncWhoopRecoveryChunked({
+      userId,
+      connectedAccountId,
+      accessToken,
+      tz,
+      windowStartAt,
+      windowEndAt,
+      chunkDays: 7,
+    });
+    fetched = r.fetched;
+    upserted = r.upserted;
+  } catch {
+    // Recovery may partially fail; workouts already saved above.
+  }
+
   // Weight is a point-in-time measurement. Store the current weight on the user's
   // current local day (day of the pull) instead of stamping the whole window.
   if (profileWeightKg != null) {
@@ -518,22 +703,6 @@ export async function syncWhoopDailyStats({
       },
       select: { id: true },
     });
-  }
-
-  let workoutsFetched = 0;
-  let workoutsUpserted = 0;
-  try {
-    const w = await syncWhoopWorkoutsInWindow({
-      userId,
-      connectedAccountId,
-      accessToken,
-      startIso,
-      endIso,
-    });
-    workoutsFetched = w.fetched;
-    workoutsUpserted = w.upserted;
-  } catch {
-    // Missing read:workout scope or workout API error — daily recovery sync still succeeds.
   }
 
   await prisma().connectedAccount.update({

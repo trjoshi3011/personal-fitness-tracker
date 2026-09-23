@@ -312,7 +312,7 @@ export function TrainingContextPanel() {
           spellCheck
         />
         <p className="mt-2 text-[10px] text-[color:var(--color-text-tertiary)]">
-          Uses your last 3 weeks of Strava runs plus these notes. Not medical advice.
+          Uses your last 3 weeks of runs (WHOOP / Fitbit / Strava) plus these notes. Not medical advice.
         </p>
       </div>
 

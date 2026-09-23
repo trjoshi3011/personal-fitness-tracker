@@ -43,7 +43,12 @@ export async function POST(req: Request) {
   });
 
   if (!result.ok) {
-    if (wantsHtml) return redirectToSettings({ whoopSync: "error" });
+    if (wantsHtml) {
+      return redirectToSettings({
+        whoopSync: "error",
+        reason: result.error.slice(0, 280),
+      });
+    }
     return NextResponse.json(
       { ok: false, error: "WHOOP_SYNC_FAILED", message: result.error },
       { status: 500 },

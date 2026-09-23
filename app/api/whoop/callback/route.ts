@@ -63,8 +63,12 @@ export async function GET(req: Request) {
   }
 
   const origin = url.origin;
-  const redirectUri =
-    process.env.WHOOP_REDIRECT_URI ?? `${origin}/api/whoop/callback`;
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(
+    origin,
+  );
+  const redirectUri = isLocalhost
+    ? `${origin}/api/whoop/callback`
+    : (process.env.WHOOP_REDIRECT_URI ?? `${origin}/api/whoop/callback`);
 
   try {
     const token = await exchangeWhoopCodeForTokens(code, redirectUri);

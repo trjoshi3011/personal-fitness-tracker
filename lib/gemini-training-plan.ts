@@ -35,7 +35,7 @@ export type TrainingPlanPayload = {
   days: PlannedDay[];
 };
 
-const SYSTEM_PROMPT = `You are an expert **running-only** coach. The athlete logs runs on Strava. You must build a **two-week** schedule of running workouts only (no strength sessions, no cross-training blocks unless framed as optional rest-day walking).
+const SYSTEM_PROMPT = `You are an expert **running-only** coach. The athlete logs runs primarily on WHOOP (with Fitbit / historical Strava when present). You must build a **two-week** schedule of running workouts only (no strength sessions, no cross-training blocks unless framed as optional rest-day walking).
 
 You must output **only valid JSON** (no markdown fences) matching this shape:
 
@@ -55,7 +55,7 @@ You must output **only valid JSON** (no markdown fences) matching this shape:
 Rules:
 - You will be given **exactly fourteen dates** (Monday week 1 → Sunday week 2). Include **one object per date**, same order, **matching each date string exactly**.
 - Each day: **1–2 running sessions max**, OR **one** session with "type": "rest" for full rest (title e.g. "Rest", details = mobility or easy walk optional).
-- "run" sessions: be specific (distance **or** duration, terrain if relevant, intensity: easy / steady / tempo / intervals / long run). Respect the athlete's Strava history and any **user notes** (injuries, reduce volume, etc.).
+- "run" sessions: be specific (distance **or** duration, terrain if relevant, intensity: easy / steady / tempo / intervals / long run). Respect the athlete's recent run history and any **user notes** (injuries, reduce volume, etc.).
 - If user notes mention injury or dial-back, **reduce volume and intensity** and add extra rest or easy days; never contradict explicit limitations.
 - Do not invent a diagnosed injury. If notes are vague, ask nothing—just apply conservative load.
 - **Never** use type "lift" or non-running strength prescriptions. If you would have suggested lifting, use "rest" or an easy run instead.`;
@@ -177,13 +177,13 @@ export function mergePlanToWeek(
   return mergePlanToExpectedDays(expectedDateKeys, raw);
 }
 
-async function buildStravaRunningContext21Days(userId: string): Promise<string> {
+async function buildRunningContext21Days(userId: string): Promise<string> {
   const now = new Date();
   const start21 = new Date(now.getTime() - 21 * 86_400_000);
   const runs = await fetchStravaRunsInRange(userId, start21, now);
 
   if (runs.length === 0) {
-    return "Last 21 days: no Strava runs logged.";
+    return "Last 21 days: no runs logged.";
   }
 
   const totalMeters = runs.reduce((sum, r) => sum + (r.distanceMeters ?? 0), 0);
@@ -216,7 +216,7 @@ async function buildStravaRunningContext21Days(userId: string): Promise<string> 
     });
 
   const lines = [
-    `Strava runs in last 21 days: ${runs.length}`,
+    `Runs in last 21 days: ${runs.length}`,
     `Unique run days: ${runDays}`,
     `Total distance: ${totalMiles.toFixed(1)} mi`,
     `Longest single run: ${metersToMiles(longestRunMeters).toFixed(2)} mi`,
@@ -275,7 +275,7 @@ export async function generateTrainingPlanForTwoWeeks(
   ];
   const dateLines = expectedKeys.map((k, i) => `- ${k} (${weekdayNames[i]})`);
 
-  const stravaContext = await buildStravaRunningContext21Days(userId);
+  const runContext = await buildRunningContext21Days(userId);
   const notes = userNotes.trim();
 
   const userPrompt = [
@@ -283,8 +283,8 @@ export async function generateTrainingPlanForTwoWeeks(
     `Two-week block (use these dates exactly, in order):`,
     ...dateLines,
     ``,
-    `Strava running history (last 21 days):`,
-    stravaContext,
+    `Running history (last 21 days, WHOOP / Fitbit / Strava):`,
+    runContext,
     ``,
     notes
       ? `Athlete notes (follow carefully; prioritize health and stated limits):\n${notes}`

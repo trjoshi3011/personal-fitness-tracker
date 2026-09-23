@@ -14,6 +14,7 @@ import {
   fetchRecentRunTableRows,
   fetchStravaRunStartsInRange,
   fetchRecentRunDistancesMiForProfile,
+  sumRunDistanceMetersSince,
 } from "@/lib/merged-runs";
 import {
   activeZonedDaysOfMonth,
@@ -198,18 +199,7 @@ export default async function RunningPage({
   const shoeStart = user?.runningShoeStartDate ?? null;
   const shoeMilesMi =
     shoeStart != null
-      ? await prisma().stravaActivity
-          .aggregate({
-            where: {
-              userId,
-              startAt: { gte: shoeStart, lte: now },
-              OR: [{ type: "Run" }, { sportType: "Run" }],
-            },
-            _sum: { distanceMeters: true },
-          })
-          .then((r: { _sum: { distanceMeters: number | null } }) =>
-            metersToMiles(r._sum.distanceMeters ?? 0),
-          )
+      ? metersToMiles(await sumRunDistanceMetersSince(userId, shoeStart, now))
       : null;
   const shoeRemainingMi =
     shoeMilesMi != null ? Math.max(0, SHOE_LIMIT_MI - shoeMilesMi) : null;
@@ -224,14 +214,14 @@ export default async function RunningPage({
         <p className="text-sm tracking-widest text-stone-500 uppercase">Training</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Running</h1>
         <p className="mt-2 text-base leading-relaxed text-stone-600">
-          Strava runs, trends, and recent history.
+          WHOOP runs (plus Fitbit / historical Strava), trends, and recent history.
         </p>
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Runs" value={String(runCount)} hint="Strava · 7d" />
-        <StatCard title="Distance" value={`${metersToMiles(totalMeters).toFixed(1)} mi`} hint="Strava · 7d" />
-        <StatCard title="Avg pace" value={avgPace} hint="Strava · 7d" />
+        <StatCard title="Runs" value={String(runCount)} hint="All sources · 7d" />
+        <StatCard title="Distance" value={`${metersToMiles(totalMeters).toFixed(1)} mi`} hint="All sources · 7d" />
+        <StatCard title="Avg pace" value={avgPace} hint="All sources · 7d" />
         <StatCard title="Longest run" value={`${metersToMiles(longestMeters).toFixed(1)} mi`} hint="Strava · 7d" />
       </section>
 
@@ -305,7 +295,7 @@ export default async function RunningPage({
 
         <ChartCard
           title="Shoe tracker"
-          description="Strava run miles since new-shoes date · replace ~450 mi"
+          description="Run miles since new-shoes date · replace ~450 mi"
           contentClassName="pt-0"
         >
           <div className="space-y-4">
@@ -560,6 +550,7 @@ export default async function RunningPage({
                 totalElevationM: r.totalElevationM,
                 averageHrBpm: r.averageHrBpm,
                 maxHrBpm: r.maxHrBpm,
+                whoopZoneDurations: r.whoopZoneDurations,
               };
             })}
             tz={tz}

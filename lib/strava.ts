@@ -112,14 +112,36 @@ async function fetchStravaJson<T>(path: string, accessToken: string) {
 
   const json = (await res.json().catch(() => null)) as T | null;
   if (!res.ok || !json) {
-    const message =
-      typeof (json as any)?.message === "string"
-        ? (json as any).message
-        : `Strava API request failed (${res.status})`;
-    throw new Error(message);
+    throw new Error(formatStravaApiError(json, res.status));
   }
   return json;
 }
+
+function formatStravaApiError(json: unknown, status: number): string {
+  const body = json as {
+    message?: string;
+    errors?: Array<{ resource?: string; field?: string; code?: string }>;
+  } | null;
+  const errors = body?.errors;
+  if (Array.isArray(errors)) {
+    const inactive = errors.find(
+      (e) => e?.resource === "Application" && e?.code === "Inactive",
+    );
+    if (inactive) {
+      return (
+        "Strava API application is Inactive. On the Strava account that owns " +
+        "the app, keep an active Strava subscription, then open " +
+        "https://www.strava.com/settings/api and click Reactivate."
+      );
+    }
+  }
+  if (typeof body?.message === "string" && body.message.trim()) {
+    return body.message;
+  }
+  return `Strava API request failed (${status})`;
+}
+
+export { formatStravaApiError };
 
 export type StravaAthleteSummary = {
   id: number;
@@ -145,9 +167,14 @@ export type StravaActivitySummary = {
 } & Record<string, unknown>;
 
 export async function getStravaAthlete() {
-  const token = await getValidStravaAccessToken();
-  if (!token) return null;
-  return fetchStravaJson<StravaAthleteSummary>("/athlete", token);
+  try {
+    const token = await getValidStravaAccessToken();
+    if (!token) return null;
+    return await fetchStravaJson<StravaAthleteSummary>("/athlete", token);
+  } catch {
+    // Expired / revoked tokens should not crash callers (e.g. Settings).
+    return null;
+  }
 }
 
 export async function getRecentStravaActivities({
@@ -157,18 +184,23 @@ export async function getRecentStravaActivities({
   days?: number;
   perPage?: number;
 } = {}) {
-  const token = await getValidStravaAccessToken();
-  if (!token) return null;
-  const after = Math.floor(Date.now() / 1000) - days * 24 * 60 * 60;
-  const qs = new URLSearchParams({
-    after: String(after),
-    per_page: String(perPage),
-    page: "1",
-  });
-  return fetchStravaJson<StravaActivitySummary[]>(
-    `/athlete/activities?${qs.toString()}`,
-    token,
-  );
+  try {
+    const token = await getValidStravaAccessToken();
+    if (!token) return null;
+    const after = Math.floor(Date.now() / 1000) - days * 24 * 60 * 60;
+    const qs = new URLSearchParams({
+      after: String(after),
+      per_page: String(perPage),
+      page: "1",
+    });
+    return await fetchStravaJson<StravaActivitySummary[]>(
+      `/athlete/activities?${qs.toString()}`,
+      token,
+    );
+  } catch {
+    // Forbidden / unauthorized / refresh failure: let UI prompt reconnect.
+    return null;
+  }
 }
 
 /**

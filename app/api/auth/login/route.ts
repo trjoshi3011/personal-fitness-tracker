@@ -60,32 +60,37 @@ export async function POST(req: Request) {
     }),
   ]);
 
-  if (stravaAccount?.isActive) {
-    void syncStravaActivitiesWithLog({
-      userId: user.id,
-      connectedAccountId: stravaAccount.id,
-      days: 90,
-      getAccessToken: () => getValidStravaAccessTokenForUser(user.id),
-    }).catch(() => {});
-  }
-
-  if (fitbitAccount?.isActive) {
-    void syncFitbitDailyStatsWithLog({
-      userId: user.id,
-      connectedAccountId: fitbitAccount.id,
-      days: 90,
-      getAccessToken: () => getValidFitbitAccessTokenForUser(user.id),
-    }).catch(() => {});
-  }
-
-  if (whoopAccount?.isActive) {
-    void syncWhoopDailyStatsWithLog({
-      userId: user.id,
-      connectedAccountId: whoopAccount.id,
-      days: 90,
-      getAccessToken: () => getValidWhoopAccessTokenForUser(user.id),
-    }).catch(() => {});
-  }
+  // Run post-login syncs sequentially. Parallel WHOOP + Fitbit often hits WHOOP 429.
+  void (async () => {
+    try {
+      if (stravaAccount?.isActive) {
+        await syncStravaActivitiesWithLog({
+          userId: user.id,
+          connectedAccountId: stravaAccount.id,
+          days: 30,
+          getAccessToken: () => getValidStravaAccessTokenForUser(user.id),
+        });
+      }
+      if (fitbitAccount?.isActive) {
+        await syncFitbitDailyStatsWithLog({
+          userId: user.id,
+          connectedAccountId: fitbitAccount.id,
+          days: 30,
+          getAccessToken: () => getValidFitbitAccessTokenForUser(user.id),
+        });
+      }
+      if (whoopAccount?.isActive) {
+        await syncWhoopDailyStatsWithLog({
+          userId: user.id,
+          connectedAccountId: whoopAccount.id,
+          days: 30,
+          getAccessToken: () => getValidWhoopAccessTokenForUser(user.id),
+        });
+      }
+    } catch {
+      // Non-fatal: user can sync manually from Settings.
+    }
+  })();
 
   return redirectTo(next && next.startsWith("/") ? next : "/overview");
 }

@@ -427,8 +427,8 @@ export async function InsightsBelowFold({
   return (
     <>
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Runs" value={String(runsThisMonth)} hint={`Strava · ${daysInWindow}d window`} />
-        <StatCard title="Total distance" value={`${totalMi30.toFixed(1)} mi`} hint={`Strava · ${daysInWindow}d window`} />
+        <StatCard title="Runs" value={String(runsThisMonth)} hint={`Runs · ${daysInWindow}d window`} />
+        <StatCard title="Total distance" value={`${totalMi30.toFixed(1)} mi`} hint={`Runs · ${daysInWindow}d window`} />
         <StatCard
           title="Consistency"
           value={`${consistency}%`}
@@ -719,7 +719,7 @@ export async function InsightsBelowFold({
       </section>
 
       <section>
-        <ChartCard title="Weekly run volume" description="Strava · miles per week (runs in window)">
+        <ChartCard title="Weekly run volume" description="Miles per week (WHOOP / Fitbit / Strava in window)">
           <BarChartView data={weeklyData} xKey="week" yKey="mi" color={chartPalette.amazon} yUnit=" mi" />
         </ChartCard>
       </section>

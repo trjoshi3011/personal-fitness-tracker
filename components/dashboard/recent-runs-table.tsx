@@ -25,7 +25,7 @@ const RunRouteMap = dynamic(() => import("./run-route-map"), {
 
 export type RecentRunRow = {
   rowKey: string;
-  source: "STRAVA" | "FITBIT";
+  source: "WHOOP" | "STRAVA" | "FITBIT";
   providerActivityId: string | null;
   tag: RunTag;
   exertion: { score10: number | null; level: string } | null;
@@ -44,6 +44,8 @@ export type RecentRunRow = {
   totalElevationM: number | null;
   averageHrBpm: number | null;
   maxHrBpm: number | null;
+  /** WHOOP zone_durations JSON when available. */
+  whoopZoneDurations?: unknown | null;
 };
 
 type ZoneBucket = {
@@ -398,22 +400,55 @@ function ExpandedPanel({
   );
 }
 
-function SourcePill({ source }: { source: "STRAVA" | "FITBIT" }) {
-  const isStrava = source === "STRAVA";
+function whoopZonesToBlock(raw: unknown): ZoneBlock | null {
+  if (!raw || typeof raw !== "object") return null;
+  const z = raw as Record<string, unknown>;
+  const keys = [
+    "zone_zero_milli",
+    "zone_one_milli",
+    "zone_two_milli",
+    "zone_three_milli",
+    "zone_four_milli",
+    "zone_five_milli",
+  ] as const;
+  const buckets: ZoneBucket[] = keys.map((k, i) => {
+    const milli = typeof z[k] === "number" && Number.isFinite(z[k]) ? (z[k] as number) : 0;
+    return {
+      min: i === 0 ? 0 : i,
+      max: i === 5 ? 0 : i + 1,
+      timeSec: Math.max(0, Math.round(milli / 1000)),
+    };
+  });
+  if (buckets.every((b) => b.timeSec <= 0)) return null;
+  return {
+    type: "heartrate",
+    sensorBased: true,
+    customZones: false,
+    buckets,
+  };
+}
+
+function SourcePill({ source }: { source: "WHOOP" | "STRAVA" | "FITBIT" }) {
+  const label =
+    source === "WHOOP" ? "WHOOP" : source === "STRAVA" ? "Strava" : "Fitbit";
+  const accent =
+    source === "WHOOP"
+      ? "bg-emerald-500/15 text-emerald-800"
+      : source === "STRAVA"
+        ? "bg-[color:var(--ui-accent-soft)] text-[color:var(--color-text-secondary)]"
+        : "bg-stone-200/60 text-stone-600";
+  const dot =
+    source === "WHOOP"
+      ? "bg-emerald-600"
+      : source === "STRAVA"
+        ? "bg-[color:var(--ui-accent)]"
+        : "bg-stone-400";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${
-        isStrava
-          ? "bg-[color:var(--ui-accent-soft)] text-[color:var(--color-text-secondary)]"
-          : "bg-stone-200/60 text-stone-600"
-      }`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${accent}`}
     >
-      <span
-        className={`inline-block h-1.5 w-1.5 rounded-full ${
-          isStrava ? "bg-[color:var(--ui-accent)]" : "bg-stone-400"
-        }`}
-      />
-      {isStrava ? "Strava" : "Fitbit"}
+      <span className={`inline-block h-1.5 w-1.5 rounded-full ${dot}`} />
+      {label}
     </span>
   );
 }
@@ -470,7 +505,21 @@ export function RecentRunsTable({ runs, tz }: { runs: RecentRunRow[]; tz: string
   );
 
   const loadDetails = useCallback(async (row: RecentRunRow) => {
-    if (!row.providerActivityId) return;
+    if (row.source === "WHOOP") {
+      const block = whoopZonesToBlock(row.whoopZoneDurations);
+      setDetails((prev) => ({
+        ...prev,
+        [row.rowKey]: {
+          status: "ready",
+          polyline: null,
+          zones: block ? [block] : [],
+          zonesError: block ? null : "No WHOOP zone data for this workout.",
+          zonesHint: "WHOOP heart-rate zones (no GPS map from WHOOP).",
+        },
+      }));
+      return;
+    }
+    if (row.source !== "STRAVA" || !row.providerActivityId) return;
     setDetails((prev) => ({ ...prev, [row.rowKey]: { status: "loading" } }));
     try {
       const res = await fetch(
@@ -511,7 +560,10 @@ export function RecentRunsTable({ runs, tz }: { runs: RecentRunRow[]; tz: string
   }, [expandedKey, runs, details, loadDetails]);
 
   const handleToggle = (row: RecentRunRow) => {
-    if (row.source !== "STRAVA" || !row.providerActivityId) return;
+    const expandable =
+      (row.source === "STRAVA" && !!row.providerActivityId) ||
+      row.source === "WHOOP";
+    if (!expandable) return;
     setExpandedKey((prev) => (prev === row.rowKey ? null : row.rowKey));
   };
 
@@ -549,7 +601,9 @@ export function RecentRunsTable({ runs, tz }: { runs: RecentRunRow[]; tz: string
                 paceSecondsPerMile({ seconds: sec, meters }),
               );
               const elevFt = r.totalElevationM ? metersToFeet(r.totalElevationM) : null;
-              const isExpandable = r.source === "STRAVA" && !!r.providerActivityId;
+              const isExpandable =
+                (r.source === "STRAVA" && !!r.providerActivityId) ||
+                r.source === "WHOOP";
               const isOpen = expandedKey === r.rowKey;
               const startAt = new Date(r.startAtIso);
               const distancePct =
