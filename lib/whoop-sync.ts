@@ -66,6 +66,7 @@ export async function whoopDeveloperApiGet(path: string, accessToken: string) {
 type RecoveryRow = {
   cycle_id: number;
   sleep_id: string;
+  updated_at?: string;
   score_state: string;
   score?: {
     user_calibrating?: boolean;
@@ -101,6 +102,7 @@ type WhoopWorkoutApiRecord = {
   id: string;
   start: string;
   end: string;
+  updated_at?: string;
   timezone_offset?: string;
   sport_name: string;
   sport_id?: number;
@@ -155,9 +157,11 @@ export async function syncWhoopWorkoutsChunked({
   windowStartAt: Date;
   windowEndAt: Date;
   chunkDays?: number;
-}): Promise<{ fetched: number; upserted: number }> {
+}): Promise<{ fetched: number; upserted: number; skipped: number }> {
+  const known = await loadKnownWorkoutVersions(userId, windowStartAt, windowEndAt);
   let fetched = 0;
   let upserted = 0;
+  let skipped = 0;
   let chunkIndex = 0;
   for (const chunk of utcDateChunks(windowStartAt, windowEndAt, chunkDays)) {
     if (chunkIndex > 0) await sleepMs(1200);
@@ -167,12 +171,45 @@ export async function syncWhoopWorkoutsChunked({
       accessToken,
       startIso: chunk.start.toISOString(),
       endIso: chunk.end.toISOString(),
+      known,
     });
     fetched += w.fetched;
     upserted += w.upserted;
+    skipped += w.skipped;
     chunkIndex += 1;
   }
-  return { fetched, upserted };
+  return { fetched, upserted, skipped };
+}
+
+function payloadUpdatedAt(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const v = (raw as { updated_at?: unknown }).updated_at;
+  return typeof v === "string" && v ? v : null;
+}
+
+/** providerWorkoutId → WHOOP `updated_at` for workouts already stored in the window. */
+async function loadKnownWorkoutVersions(
+  userId: string,
+  windowStartAt: Date,
+  windowEndAt: Date,
+): Promise<Map<string, string>> {
+  const rows = await prisma().whoopWorkout.findMany({
+    where: {
+      userId,
+      scoreState: "SCORED",
+      startAt: {
+        gte: new Date(windowStartAt.getTime() - 86_400_000),
+        lte: windowEndAt,
+      },
+    },
+    select: { providerWorkoutId: true, rawPayload: true },
+  });
+  const out = new Map<string, string>();
+  for (const r of rows) {
+    const u = payloadUpdatedAt(r.rawPayload);
+    if (u) out.set(r.providerWorkoutId, u);
+  }
+  return out;
 }
 
 async function syncWhoopWorkoutsInWindow({
@@ -181,16 +218,19 @@ async function syncWhoopWorkoutsInWindow({
   accessToken,
   startIso,
   endIso,
+  known,
 }: {
   userId: string;
   connectedAccountId: string;
   accessToken: string;
   startIso: string;
   endIso: string;
-}): Promise<{ fetched: number; upserted: number }> {
+  known: Map<string, string>;
+}): Promise<{ fetched: number; upserted: number; skipped: number }> {
   let nextToken: string | undefined;
   let fetched = 0;
   let upserted = 0;
+  let skipped = 0;
   do {
     const q = new URLSearchParams({
       limit: "25",
@@ -210,6 +250,16 @@ async function syncWhoopWorkoutsInWindow({
       const startAt = new Date(rec.start);
       const endAt = new Date(rec.end);
       if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) continue;
+
+      if (
+        rec.score_state === "SCORED" &&
+        rec.updated_at &&
+        known.get(rec.id) === rec.updated_at
+      ) {
+        fetched += 1;
+        skipped += 1;
+        continue;
+      }
 
       const sc = rec.score;
       const z = sc?.zone_durations;
@@ -326,7 +376,7 @@ async function syncWhoopWorkoutsInWindow({
     }
   } while (nextToken);
 
-  return { fetched, upserted };
+  return { fetched, upserted, skipped };
 }
 
 type DayAgg = {
@@ -372,6 +422,47 @@ function shouldReplace(existing: DayAgg, incoming: DayAgg): boolean {
   return incoming.priority > existing.priority;
 }
 
+type KnownRecovery = {
+  /** sleep_id → recovery `updated_at` already stored. */
+  bySleepId: Map<string, string>;
+  /** dayKey → priority + sleep_id of the stored row, so a nap can't overwrite a main sleep. */
+  byDay: Map<string, { priority: number; sleepId: string | null }>;
+};
+
+async function loadKnownRecovery(
+  userId: string,
+  windowStartAt: Date,
+  windowEndAt: Date,
+): Promise<KnownRecovery> {
+  const rows = await prisma().dailyWhoopStat.findMany({
+    where: {
+      userId,
+      date: {
+        gte: new Date(windowStartAt.getTime() - 2 * 86_400_000),
+        lte: new Date(windowEndAt.getTime() + 86_400_000),
+      },
+    },
+    select: { date: true, recoveryScore: true, rawPayload: true },
+  });
+  const known: KnownRecovery = { bySleepId: new Map(), byDay: new Map() };
+  for (const r of rows) {
+    const raw = (r.rawPayload ?? {}) as {
+      recovery?: { sleep_id?: unknown; updated_at?: unknown };
+      sleep?: { nap?: unknown };
+    };
+    const sleepId =
+      typeof raw.recovery?.sleep_id === "string" ? raw.recovery.sleep_id : null;
+    if (!sleepId) continue;
+    const updatedAt = payloadUpdatedAt(raw.recovery);
+    if (updatedAt) known.bySleepId.set(sleepId, updatedAt);
+    known.byDay.set(r.date.toISOString().slice(0, 10), {
+      priority: aggPriority(Boolean(raw.sleep?.nap), r.recoveryScore),
+      sleepId,
+    });
+  }
+  return known;
+}
+
 async function syncWhoopRecoveryInWindow({
   userId,
   connectedAccountId,
@@ -380,6 +471,7 @@ async function syncWhoopRecoveryInWindow({
   startIso,
   endIso,
   cycleCache,
+  known,
 }: {
   userId: string;
   connectedAccountId: string;
@@ -388,10 +480,12 @@ async function syncWhoopRecoveryInWindow({
   startIso: string;
   endIso: string;
   cycleCache: Map<number, CycleRow>;
-}): Promise<{ fetched: number; upserted: number }> {
+  known: KnownRecovery;
+}): Promise<{ fetched: number; upserted: number; skipped: number }> {
   const map = new Map<string, DayAgg>();
   let nextToken: string | undefined;
   let fetched = 0;
+  let skipped = 0;
 
   do {
     const q = new URLSearchParams({
@@ -411,6 +505,11 @@ async function syncWhoopRecoveryInWindow({
 
     for (const rec of records) {
       if (rec.score_state !== "SCORED" || !rec.score) continue;
+
+      if (rec.updated_at && known.bySleepId.get(rec.sleep_id) === rec.updated_at) {
+        skipped += 1;
+        continue;
+      }
 
       let sleep: SleepRow | null = null;
       try {
@@ -513,6 +612,12 @@ async function syncWhoopRecoveryInWindow({
     if (!y || !mo || !d) continue;
     const date = new Date(Date.UTC(y, mo - 1, d, 0, 0, 0, 0));
 
+    const aggSleepId = (agg.raw.recovery as RecoveryRow | undefined)?.sleep_id ?? null;
+    const prior = known.byDay.get(dayKey);
+    if (prior && prior.sleepId !== aggSleepId && prior.priority > agg.priority) {
+      continue;
+    }
+
     await prisma().dailyWhoopStat.upsert({
       where: { userId_date: { userId, date } },
       create: {
@@ -548,9 +653,14 @@ async function syncWhoopRecoveryInWindow({
       select: { id: true },
     });
     upserted += 1;
+    if (aggSleepId) {
+      known.byDay.set(dayKey, { priority: agg.priority, sleepId: aggSleepId });
+      const u = (agg.raw.recovery as RecoveryRow | undefined)?.updated_at;
+      if (u) known.bySleepId.set(aggSleepId, u);
+    }
   }
 
-  return { fetched, upserted };
+  return { fetched, upserted, skipped };
 }
 
 /**
@@ -572,13 +682,17 @@ export async function syncWhoopRecoveryChunked({
   windowStartAt: Date;
   windowEndAt: Date;
   chunkDays?: number;
-}): Promise<{ fetched: number; upserted: number }> {
+}): Promise<{ fetched: number; upserted: number; skipped: number }> {
   const cycleCache = new Map<number, CycleRow>();
+  const known = await loadKnownRecovery(userId, windowStartAt, windowEndAt);
   let fetched = 0;
   let upserted = 0;
+  let skipped = 0;
   let chunkIndex = 0;
+  let lastChunkCalledApi = false;
   for (const chunk of utcDateChunks(windowStartAt, windowEndAt, chunkDays)) {
-    if (chunkIndex > 0) await sleepMs(2500);
+    // Only pause after chunks that hit the per-record sleep/cycle endpoints.
+    if (chunkIndex > 0 && lastChunkCalledApi) await sleepMs(2500);
     try {
       const r = await syncWhoopRecoveryInWindow({
         userId,
@@ -588,11 +702,14 @@ export async function syncWhoopRecoveryChunked({
         startIso: chunk.start.toISOString(),
         endIso: chunk.end.toISOString(),
         cycleCache,
+        known,
       });
       fetched += r.fetched;
       upserted += r.upserted;
+      skipped += r.skipped;
+      lastChunkCalledApi = r.fetched > 0;
       console.log(
-        `[whoop-recovery] chunk ${chunk.start.toISOString().slice(0, 10)} → ${chunk.end.toISOString().slice(0, 10)} fetched=${r.fetched} upserted=${r.upserted}`,
+        `[whoop-recovery] chunk ${chunk.start.toISOString().slice(0, 10)} → ${chunk.end.toISOString().slice(0, 10)} fetched=${r.fetched} upserted=${r.upserted} skipped=${r.skipped}`,
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -604,19 +721,39 @@ export async function syncWhoopRecoveryChunked({
     }
     chunkIndex += 1;
   }
-  return { fetched, upserted };
+  return { fetched, upserted, skipped };
 }
 
+/** Re-pull this many days before the newest stored row so late-scored data still updates. */
+const WHOOP_INCREMENTAL_OVERLAP_DAYS = 3;
+
+function incrementalStart(requestedStart: Date, latest: Date | null | undefined): Date {
+  if (!latest) return requestedStart;
+  const fromLatest = new Date(
+    latest.getTime() - WHOOP_INCREMENTAL_OVERLAP_DAYS * 86_400_000,
+  );
+  return fromLatest > requestedStart ? fromLatest : requestedStart;
+}
+
+/**
+ * Sync WHOOP workouts + daily recovery/sleep/strain.
+ *
+ * Default is incremental: each stream starts a few days before its newest stored row
+ * (bounded by `days`). `full: true` walks the whole `days` window to fill gaps.
+ * Either way, records whose WHOOP `updated_at` matches what's stored are skipped.
+ */
 export async function syncWhoopDailyStats({
   userId,
   connectedAccountId,
   accessToken,
   days,
+  full = false,
 }: {
   userId: string;
   connectedAccountId: string;
   accessToken: string;
   days: number;
+  full?: boolean;
 }) {
   const user = await prisma().user.findUnique({
     where: { id: userId },
@@ -632,19 +769,43 @@ export async function syncWhoopDailyStats({
   const windowEndAt = new Date();
   const windowStartAt = utcInclusiveWindowStart(windowEndAt, daysClamped);
 
+  let workoutsStartAt = windowStartAt;
+  let recoveryStartAt = windowStartAt;
+  if (!full) {
+    const [latestWorkout, latestRecovery] = await Promise.all([
+      prisma().whoopWorkout.findFirst({
+        where: { userId },
+        orderBy: { startAt: "desc" },
+        select: { startAt: true },
+      }),
+      prisma().dailyWhoopStat.findFirst({
+        where: { userId, recoveryScore: { not: null } },
+        orderBy: { date: "desc" },
+        select: { date: true },
+      }),
+    ]);
+    workoutsStartAt = incrementalStart(windowStartAt, latestWorkout?.startAt);
+    recoveryStartAt = incrementalStart(windowStartAt, latestRecovery?.date);
+  }
+  console.log(
+    `[whoop-sync] ${full ? "full" : "incremental"} workouts from ${workoutsStartAt.toISOString().slice(0, 10)}, recovery from ${recoveryStartAt.toISOString().slice(0, 10)}`,
+  );
+
   // Workouts first (lighter API). Chunked so summer history can backfill without 429.
   let workoutsFetched = 0;
   let workoutsUpserted = 0;
+  let workoutsSkipped = 0;
   try {
     const w = await syncWhoopWorkoutsChunked({
       userId,
       connectedAccountId,
       accessToken,
-      windowStartAt,
+      windowStartAt: workoutsStartAt,
       windowEndAt,
     });
     workoutsFetched = w.fetched;
     workoutsUpserted = w.upserted;
+    workoutsSkipped = w.skipped;
   } catch {
     // Missing read:workout scope or temporary API error — recovery sync may still succeed.
   }
@@ -668,18 +829,20 @@ export async function syncWhoopDailyStats({
 
   let fetched = 0;
   let upserted = 0;
+  let skipped = 0;
   try {
     const r = await syncWhoopRecoveryChunked({
       userId,
       connectedAccountId,
       accessToken,
       tz,
-      windowStartAt,
+      windowStartAt: recoveryStartAt,
       windowEndAt,
       chunkDays: 7,
     });
     fetched = r.fetched;
     upserted = r.upserted;
+    skipped = r.skipped;
   } catch {
     // Recovery may partially fail; workouts already saved above.
   }
@@ -719,9 +882,12 @@ export async function syncWhoopDailyStats({
   return {
     fetched,
     upserted,
+    skipped,
     days: daysClamped,
+    windowStartAt: workoutsStartAt < recoveryStartAt ? workoutsStartAt : recoveryStartAt,
     workoutsFetched,
     workoutsUpserted,
+    workoutsSkipped,
   };
 }
 
@@ -730,21 +896,28 @@ export type WhoopSyncWithLogResult =
       ok: true;
       fetched: number;
       upserted: number;
+      skipped: number;
       days: number;
       workoutsFetched: number;
       workoutsUpserted: number;
+      workoutsSkipped: number;
     }
-  | { ok: false; error: string };
+  | { ok: false; error: string; alreadyRunning?: boolean };
+
+/** A PARTIAL WHOOP SyncLog older than this is treated as dead (server restart, timeout). */
+const WHOOP_SYNC_STALE_MS = 15 * 60_000;
 
 export async function syncWhoopDailyStatsWithLog({
   userId,
   connectedAccountId,
   days,
+  full = false,
   getAccessToken,
 }: {
   userId: string;
   connectedAccountId: string;
   days: number;
+  full?: boolean;
   getAccessToken: () => Promise<string | null>;
 }): Promise<WhoopSyncWithLogResult> {
   const daysClamped =
@@ -754,6 +927,22 @@ export async function syncWhoopDailyStatsWithLog({
   const startedAt = new Date();
   const windowEndAt = new Date();
   const windowStartAt = utcInclusiveWindowStart(windowEndAt, daysClamped);
+  const staleBefore = new Date(startedAt.getTime() - WHOOP_SYNC_STALE_MS);
+
+  await prisma().syncLog.updateMany({
+    where: {
+      userId,
+      provider: "WHOOP",
+      status: "PARTIAL",
+      finishedAt: null,
+      startedAt: { lt: staleBefore },
+    },
+    data: {
+      status: "FAILED",
+      finishedAt: startedAt,
+      errorMessage: "Interrupted (server restarted or request timed out)",
+    },
+  });
 
   const syncLog = await prisma().syncLog.create({
     data: {
@@ -767,8 +956,34 @@ export async function syncWhoopDailyStatsWithLog({
       fetchedCount: 0,
       upsertedCount: 0,
     },
-    select: { id: true },
+    select: { id: true, startedAt: true },
   });
+
+  // Insert-then-check so two near-simultaneous requests can't both proceed:
+  // whichever row started first wins, the other backs off.
+  const earlierRunning = await prisma().syncLog.findFirst({
+    where: {
+      userId,
+      provider: "WHOOP",
+      status: "PARTIAL",
+      finishedAt: null,
+      id: { not: syncLog.id },
+      startedAt: { gte: staleBefore, lte: syncLog.startedAt },
+    },
+    orderBy: [{ startedAt: "asc" }, { id: "asc" }],
+    select: { id: true, startedAt: true },
+  });
+  if (
+    earlierRunning &&
+    (earlierRunning.startedAt < syncLog.startedAt || earlierRunning.id < syncLog.id)
+  ) {
+    const msg = "A WHOOP sync is already running";
+    await prisma().syncLog.update({
+      where: { id: syncLog.id },
+      data: { status: "FAILED", finishedAt: new Date(), errorMessage: `Skipped: ${msg}` },
+    });
+    return { ok: false, error: msg, alreadyRunning: true };
+  }
 
   try {
     const accessToken = await getAccessToken();
@@ -790,6 +1005,7 @@ export async function syncWhoopDailyStatsWithLog({
       connectedAccountId,
       accessToken,
       days: daysClamped,
+      full,
     });
 
     await prisma().syncLog.update({
@@ -797,8 +1013,9 @@ export async function syncWhoopDailyStatsWithLog({
       data: {
         status: "SUCCESS",
         finishedAt: new Date(),
-        fetchedCount: result.fetched,
-        upsertedCount: result.upserted,
+        windowStartAt: result.windowStartAt,
+        fetchedCount: result.fetched + result.workoutsFetched,
+        upsertedCount: result.upserted + result.workoutsUpserted,
       },
     });
 
@@ -806,9 +1023,11 @@ export async function syncWhoopDailyStatsWithLog({
       ok: true,
       fetched: result.fetched,
       upserted: result.upserted,
+      skipped: result.skipped,
       days: result.days,
       workoutsFetched: result.workoutsFetched,
       workoutsUpserted: result.workoutsUpserted,
+      workoutsSkipped: result.workoutsSkipped,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

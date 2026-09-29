@@ -21,6 +21,7 @@ type SettingsSearch = {
   fetched?: string;
   upserted?: string;
   workoutsUpserted?: string;
+  skipped?: string;
   profile?: string;
   password?: string;
 };
@@ -208,8 +209,14 @@ export default async function SettingsPage({
               {sp.workoutsUpserted != null && sp.workoutsUpserted !== "0"
                 ? ` · workouts saved ${sp.workoutsUpserted}`
                 : ""}
+              {sp.skipped != null && sp.skipped !== "0"
+                ? ` · ${sp.skipped} unchanged skipped`
+                : ""}
               ).
             </p>
+          ) : null}
+          {sp.whoopSync === "running" ? (
+            <p>A WHOOP sync is already running. Give it a minute, then refresh.</p>
           ) : null}
           {sp.whoopSync === "error" ? (
             <p className="text-[color:var(--ui-danger)]">
@@ -520,7 +527,7 @@ export default async function SettingsPage({
                 </form>
               ) : null}
               {whoopConnected ? (
-                <form action="/api/whoop/sync?days=180" method="post">
+                <form action="/api/whoop/sync?days=180&full=1" method="post">
                   <button
                     type="submit"
                     className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-900/20 bg-amber-50/80 px-3 text-xs font-medium text-stone-800 transition-all hover:border-orange-500/40 hover:bg-amber-50"

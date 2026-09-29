@@ -11,6 +11,7 @@ export async function POST(req: Request) {
   const days = Number(url.searchParams.get("days") ?? "90");
   const daysClamped =
     Number.isFinite(days) && days > 0 ? Math.min(days, MAX_WHOOP_SYNC_DAYS) : 90;
+  const full = url.searchParams.get("full") === "1";
   const accept = req.headers.get("accept") ?? "";
   const wantsHtml = accept.includes("text/html");
 
@@ -39,10 +40,18 @@ export async function POST(req: Request) {
     userId,
     connectedAccountId: account.id,
     days: daysClamped,
+    full,
     getAccessToken: () => getValidWhoopAccessToken(),
   });
 
   if (!result.ok) {
+    if (result.alreadyRunning) {
+      if (wantsHtml) return redirectToSettings({ whoopSync: "running" });
+      return NextResponse.json(
+        { ok: false, error: "WHOOP_SYNC_RUNNING", message: result.error },
+        { status: 409 },
+      );
+    }
     if (wantsHtml) {
       return redirectToSettings({
         whoopSync: "error",
@@ -61,6 +70,7 @@ export async function POST(req: Request) {
       fetched: String(result.fetched),
       upserted: String(result.upserted),
       workoutsUpserted: String(result.workoutsUpserted),
+      skipped: String(result.skipped + result.workoutsSkipped),
     });
   }
 
@@ -68,8 +78,10 @@ export async function POST(req: Request) {
     ok: true,
     fetched: result.fetched,
     upserted: result.upserted,
+    skipped: result.skipped,
     days: result.days,
     workoutsFetched: result.workoutsFetched,
     workoutsUpserted: result.workoutsUpserted,
+    workoutsSkipped: result.workoutsSkipped,
   });
 }
