@@ -1,5 +1,11 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
+
+import { Input } from "@/components/ui/input";
+
+
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Upload, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
@@ -100,7 +106,7 @@ export function BackfillUpload() {
         </div>
 
         <div className="flex items-center gap-2">
-          <input
+          <Input
             ref={inputRef}
             type="file"
             accept={ACCEPT_ATTR}
@@ -108,11 +114,11 @@ export function BackfillUpload() {
             onChange={onChange}
             disabled={status.kind === "uploading"}
           />
-          <button
+          <Button variant="outline"
             type="button"
             onClick={onPick}
             disabled={status.kind === "uploading"}
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-[color:var(--color-border-default)] bg-[color:color-mix(in_srgb,var(--background)_60%,transparent)] px-4 text-sm font-medium text-[color:var(--color-text-secondary)] transition-all hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-2 px-4 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-60"
           >
             {status.kind === "uploading" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -120,7 +126,7 @@ export function BackfillUpload() {
               <Upload className="h-4 w-4" />
             )}
             {status.kind === "uploading" ? "Importing…" : "Upload export.xml"}
-          </button>
+          </Button>
         </div>
       </div>
 

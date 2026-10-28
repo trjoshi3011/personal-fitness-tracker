@@ -1,3 +1,7 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Label } from "@/components/ui/label";
 import "server-only";
 import Link from "next/link";
 
@@ -593,24 +597,24 @@ export async function InsightsBelowFold({
               method="post"
               className="grid gap-3 sm:grid-cols-2"
             >
-              <label className="block sm:col-span-2">
+              <Label className="block sm:col-span-2">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Date
                 </div>
-                <input
+                <Input
                   name="date"
                   type="date"
                   required
                   defaultValue={todayIso}
                   max={todayIso}
-                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 />
-              </label>
-              <label className="block">
+              </Label>
+              <Label className="block">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Weight
                 </div>
-                <input
+                <Input
                   name="weight"
                   type="number"
                   step="0.1"
@@ -618,38 +622,38 @@ export async function InsightsBelowFold({
                   max="900"
                   placeholder="e.g. 178.4"
                   required
-                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 />
-              </label>
-              <label className="block">
+              </Label>
+              <Label className="block">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Unit
                 </div>
-                <select
+                <NativeSelect
                   name="unit"
                   defaultValue="lb"
-                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 >
                   <option value="lb">Pounds (lb)</option>
                   <option value="kg">Kilograms (kg)</option>
-                </select>
-              </label>
-              <label className="block sm:col-span-2">
+                </NativeSelect>
+              </Label>
+              <Label className="block sm:col-span-2">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Notes (optional)
                 </div>
-                <input
+                <Input
                   name="notes"
                   type="text"
                   maxLength={280}
                   placeholder="e.g. morning, post-run, post-meal"
-                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 />
-              </label>
+              </Label>
               <div className="sm:col-span-2 flex items-center gap-3">
-                <button className="inline-flex h-10 items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800">
+                <Button type="submit" variant="default" className="inline-flex h-10 items-center justify-center px-4 text-sm font-medium transition-colors">
                   Save entry
-                </button>
+                </Button>
                 {whoopConnected ? (
                   <span className="text-xs text-stone-500">
                     Tip: log on days you weighed in but didn’t wear WHOOP.
@@ -697,8 +701,8 @@ export async function InsightsBelowFold({
                       ) : null}
                     </div>
                     <form action="/api/insights/weight" method="post">
-                      <input type="hidden" name="_action" value="delete" />
-                      <input type="hidden" name="id" value={row.id} />
+                      <Input type="hidden" name="_action" value="delete" />
+                      <Input type="hidden" name="id" value={row.id} />
                       <button
                         type="submit"
                         className="text-xs font-medium text-stone-500 hover:text-[color:var(--ui-danger)]"

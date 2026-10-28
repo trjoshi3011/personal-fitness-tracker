@@ -1,5 +1,11 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
+
+import { Input } from "@/components/ui/input";
+
+
 import * as React from "react";
 import { MessageCircle, Loader2, SendHorizonal, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -293,7 +299,7 @@ export function RunningChat() {
   if (collapsed) {
     if (!ready) return null;
     return (
-      <button
+      <Button variant="outline"
         type="button"
         onClick={() => {
           // Snap panel to bottom-right on reopen.
@@ -306,12 +312,12 @@ export function RunningChat() {
           });
           setCollapsed(false);
         }}
-        className="fixed right-5 bottom-5 z-40 inline-flex items-center gap-2 rounded-full border border-[color:var(--color-border-default)] bg-card px-4 py-2 text-sm font-medium text-[color:var(--color-text-primary)] shadow-md transition-colors hover:bg-[color:var(--ui-accent-soft)]"
+        className="fixed right-5 bottom-5 z-40 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors"
       >
         <MessageCircle className="h-4 w-4 text-[color:var(--ui-accent)]" />
         Coach Chat
         <ChevronUp className="h-4 w-4 text-[color:var(--color-text-tertiary)]" />
-      </button>
+      </Button>
     );
   }
 
@@ -333,15 +339,15 @@ export function RunningChat() {
             <p className="text-[11px] text-[color:var(--color-text-tertiary)]">Uses your last 3 weeks of run data</p>
           </div>
         </div>
-        <button
+        <Button variant="outline"
           type="button"
           onClick={() => setCollapsed(true)}
-          className="inline-flex h-8 items-center gap-1 rounded-lg border border-[color:var(--color-border-default)] bg-[color:color-mix(in_srgb,var(--background)_60%,transparent)] px-2 text-xs font-medium text-[color:var(--color-text-secondary)] transition-colors hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)]"
+          className="inline-flex h-8 items-center gap-1 px-2 text-xs font-medium transition-colors"
           aria-label="Collapse coach chat"
         >
           <ChevronDown className="h-3.5 w-3.5" />
           Collapse
-        </button>
+        </Button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col space-y-2 px-4 py-3">
@@ -377,22 +383,22 @@ export function RunningChat() {
         )}
 
         <form onSubmit={onSubmit} className="flex items-center gap-2">
-          <input
+          <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about your upcoming training..."
-            className="h-10 flex-1 rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:var(--ui-accent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+            className="h-10 flex-1 px-3 text-sm"
             maxLength={1200}
             disabled={loading}
           />
-          <button
+          <Button variant="default"
             type="submit"
             disabled={loading || !input.trim()}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[color:var(--ui-accent)] px-3 text-sm font-medium text-[color:var(--color-text-inverse)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--ui-accent)_88%,black)] disabled:opacity-50"
+            className="inline-flex h-10 items-center gap-1.5 px-3 text-sm font-medium transition-colors disabled:opacity-50"
           >
             <SendHorizonal className="h-4 w-4" />
             Send
-          </button>
+          </Button>
         </form>
       </div>
       <button

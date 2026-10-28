@@ -1,5 +1,8 @@
 "use client";
 
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+
+
 import type { ReactNode } from "react";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
@@ -569,29 +572,29 @@ export function RecentRunsTable({ runs, tz }: { runs: RecentRunRow[]; tz: string
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-separate border-spacing-y-1.5 text-sm">
-        <thead>
-          <tr className="text-[10px] tracking-wider text-stone-500 uppercase">
-            <th className="px-3 pb-2 text-left font-medium">Date</th>
-            <th className="px-3 pb-2 text-left font-medium">Run</th>
-            <th className="px-3 pb-2 text-right font-medium">Distance</th>
-            <th className="px-3 pb-2 text-right font-medium">Time</th>
-            <th className="px-3 pb-2 text-right font-medium">Pace</th>
-            <th className="px-3 pb-2 text-right font-medium">Elev</th>
-            <th className="px-3 pb-2 text-right font-medium">Avg HR</th>
-            <th className="px-3 pb-2 text-right font-medium">Max HR</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table className="w-full border-separate border-spacing-y-1.5 text-sm">
+        <TableHeader>
+          <TableRow className="text-[10px] tracking-wider text-stone-500 uppercase">
+            <TableHead className="px-3 pb-2 text-left font-medium">Date</TableHead>
+            <TableHead className="px-3 pb-2 text-left font-medium">Run</TableHead>
+            <TableHead className="px-3 pb-2 text-right font-medium">Distance</TableHead>
+            <TableHead className="px-3 pb-2 text-right font-medium">Time</TableHead>
+            <TableHead className="px-3 pb-2 text-right font-medium">Pace</TableHead>
+            <TableHead className="px-3 pb-2 text-right font-medium">Elev</TableHead>
+            <TableHead className="px-3 pb-2 text-right font-medium">Avg HR</TableHead>
+            <TableHead className="px-3 pb-2 text-right font-medium">Max HR</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {runs.length === 0 ? (
-            <tr>
-              <td
+            <TableRow>
+              <TableCell
                 colSpan={8}
                 className="rounded-xl border border-dashed border-[color:var(--color-border-subtle)] px-3 py-8 text-center text-stone-500"
               >
                 No runs found yet. Click &ldquo;Sync now&rdquo; in Settings.
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ) : (
             taggedRuns.map((r, i) => {
               const tag = r.tag;
@@ -616,13 +619,13 @@ export function RecentRunsTable({ runs, tz }: { runs: RecentRunRow[]; tz: string
               }`;
               return (
                 <Fragment key={r.rowKey}>
-                  <tr
+                  <TableRow
                     onClick={() => handleToggle(r)}
                     className={rowClass}
                     style={{ animationDelay: `${Math.min(i * 18, 240)}ms` }}
                     aria-expanded={isExpandable ? isOpen : undefined}
                   >
-                    <td
+                    <TableCell
                       className={`${baseTdBg} rounded-l-xl px-3 py-3 align-middle whitespace-nowrap text-stone-500 shadow-[inset_1px_0_0_var(--color-border-subtle),inset_0_1px_0_var(--color-border-subtle),inset_0_-1px_0_var(--color-border-subtle)]`}
                     >
                       <div className="flex items-center gap-2">
@@ -637,8 +640,8 @@ export function RecentRunsTable({ runs, tz }: { runs: RecentRunRow[]; tz: string
                           {formatZonedDateShortWithYear(startAt, tz)}
                         </span>
                       </div>
-                    </td>
-                    <td
+                    </TableCell>
+                    <TableCell
                       className={`${baseTdBg} min-w-[260px] px-3 py-3 align-middle shadow-[inset_0_1px_0_var(--color-border-subtle),inset_0_-1px_0_var(--color-border-subtle)]`}
                     >
                       <div className="flex flex-col gap-1.5">
@@ -649,8 +652,8 @@ export function RecentRunsTable({ runs, tz }: { runs: RecentRunRow[]; tz: string
                         </div>
                         <div className="truncate font-medium text-stone-900">{r.name}</div>
                       </div>
-                    </td>
-                    <td
+                    </TableCell>
+                    <TableCell
                       className={`${baseTdBg} px-3 py-3 text-right align-middle whitespace-nowrap text-stone-700 shadow-[inset_0_1px_0_var(--color-border-subtle),inset_0_-1px_0_var(--color-border-subtle)]`}
                     >
                       <div className="flex flex-col items-end gap-1">
@@ -663,36 +666,36 @@ export function RecentRunsTable({ runs, tz }: { runs: RecentRunRow[]; tz: string
                           </div>
                         )}
                       </div>
-                    </td>
-                    <td
+                    </TableCell>
+                    <TableCell
                       className={`${baseTdBg} px-3 py-3 text-right align-middle tabular-nums whitespace-nowrap text-stone-700 shadow-[inset_0_1px_0_var(--color-border-subtle),inset_0_-1px_0_var(--color-border-subtle)]`}
                     >
                       {sec > 0 ? secondsToHhMmSs(sec) : "—"}
-                    </td>
-                    <td
+                    </TableCell>
+                    <TableCell
                       className={`${baseTdBg} px-3 py-3 text-right align-middle tabular-nums whitespace-nowrap text-stone-700 shadow-[inset_0_1px_0_var(--color-border-subtle),inset_0_-1px_0_var(--color-border-subtle)]`}
                     >
                       {runPace}
-                    </td>
-                    <td
+                    </TableCell>
+                    <TableCell
                       className={`${baseTdBg} px-3 py-3 text-right align-middle tabular-nums whitespace-nowrap text-stone-700 shadow-[inset_0_1px_0_var(--color-border-subtle),inset_0_-1px_0_var(--color-border-subtle)]`}
                     >
                       {elevFt != null ? `${Math.round(elevFt)} ft` : "—"}
-                    </td>
-                    <td
+                    </TableCell>
+                    <TableCell
                       className={`${baseTdBg} px-3 py-3 text-right align-middle tabular-nums whitespace-nowrap text-stone-700 shadow-[inset_0_1px_0_var(--color-border-subtle),inset_0_-1px_0_var(--color-border-subtle)]`}
                     >
                       {r.averageHrBpm ?? "—"}
-                    </td>
-                    <td
+                    </TableCell>
+                    <TableCell
                       className={`${baseTdBg} rounded-r-xl px-3 py-3 text-right align-middle tabular-nums whitespace-nowrap text-stone-700 shadow-[inset_-1px_0_0_var(--color-border-subtle),inset_0_1px_0_var(--color-border-subtle),inset_0_-1px_0_var(--color-border-subtle)]`}
                     >
                       {r.maxHrBpm ?? "—"}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                   {isOpen && isExpandable ? (
-                    <tr>
-                      <td
+                    <TableRow>
+                      <TableCell
                         colSpan={8}
                         className="vf-expand-in rounded-xl bg-[color:var(--color-bg-surface)]/85 px-5 py-5 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ui-accent)_20%,transparent)] backdrop-blur-sm"
                       >
@@ -700,15 +703,15 @@ export function RecentRunsTable({ runs, tz }: { runs: RecentRunRow[]; tz: string
                           row={r}
                           state={details[r.rowKey] ?? { status: "loading" }}
                         />
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : null}
                 </Fragment>
               );
             })
           )}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

@@ -17,16 +17,11 @@ import {
 import { cn } from "@/lib/utils";
 import { useTheme, type ThemeId } from "@/lib/theme-context";
 
-const navItems = [
-  { href: "/overview", label: "Overview" },
-  { href: "/running", label: "Running" },
-  { href: "/lifting", label: "Lifting" },
-  { href: "/training", label: "Training" },
-  { href: "/recovery", label: "Recovery" },
-  { href: "/insights", label: "Insights" },
-  { href: "/journey", label: "Journey" },
-  { href: "/settings", label: "Settings" },
-] as const;
+import styles from "@/components/layout/scroll-chrome.module.css";
+import { useScrollChrome } from "@/components/layout/use-scroll-chrome";
+import { navItems } from "@/components/layout/sidebar";
+import { usePathname } from "next/navigation";
+import { Separator } from "@/components/ui/separator";
 
 const themes: { id: ThemeId; label: string; swatch: string }[] = [
   { id: "olive", label: "Olive", swatch: "#6B7A3E" },
@@ -34,44 +29,18 @@ const themes: { id: ThemeId; label: string; swatch: string }[] = [
   { id: "terracotta", label: "Terracotta", swatch: "#C4856A" },
 ];
 
-const SCROLL_TOP_SHOW_PX = 24;
-const SCROLL_DELTA_PX = 6;
-
 export function TopNav() {
+  const pathname = usePathname();
+  const pageTitle = navItems.find((item) => pathname === item.href)?.label ?? "Dashboard";
   const logoutFormRef = React.useRef<HTMLFormElement | null>(null);
-  const lastScrollY = React.useRef(0);
   const { theme, setTheme, mode, toggleMode } = useTheme();
-  /** Until true, keep profile visible so SSR + first client paint match (avoids hydration errors). */
-  const [scrollReady, setScrollReady] = React.useState(false);
-  const [showProfile, setShowProfile] = React.useState(true);
-
-  React.useEffect(() => {
-    lastScrollY.current = window.scrollY;
-    if (window.scrollY > SCROLL_TOP_SHOW_PX) setShowProfile(false);
-    setScrollReady(true);
-
-    const onScroll = () => {
-      const y = window.scrollY;
-      const prev = lastScrollY.current;
-      const delta = y - prev;
-      lastScrollY.current = y;
-
-      if (y <= SCROLL_TOP_SHOW_PX) {
-        setShowProfile(true);
-        return;
-      }
-      if (delta > SCROLL_DELTA_PX) setShowProfile(false);
-      else if (delta < -SCROLL_DELTA_PX) setShowProfile(true);
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const profileVisible = !scrollReady || showProfile;
+  const faded = useScrollChrome();
 
   return (
-    <header className="relative sticky top-0 z-20 flex h-16 items-center bg-transparent px-4 md:px-6">
+    <header
+      data-faded={faded}
+      className={cn(styles.chrome, styles.header, "sticky top-0 z-20 flex h-16 items-center px-4 md:px-6")}
+    >
       <div className="flex items-center gap-2 md:hidden">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -130,20 +99,20 @@ export function TopNav() {
         </DropdownMenu>
       </div>
 
+      <div className="flex items-center gap-3 text-sm">
+        <Separator orientation="vertical" className="h-4 md:hidden" />
+        <span className="hidden text-muted-foreground sm:inline">Workspace</span>
+        <span className="hidden text-muted-foreground sm:inline" aria-hidden="true">/</span>
+        <span className="font-medium text-foreground">{pageTitle}</span>
+      </div>
       <div className="flex-1" />
 
       <div
-        className={cn(
-          "absolute top-1/2 right-4 z-20 flex -translate-y-1/2 items-center gap-2 transition-opacity duration-200 ease-out md:right-6",
-          profileVisible ? "opacity-100" : "pointer-events-none opacity-0",
-        )}
-        aria-hidden={!profileVisible}
-        suppressHydrationWarning
+        className="absolute top-1/2 right-4 z-20 flex -translate-y-1/2 items-center gap-2 md:right-6"
       >
         <button
           type="button"
           onClick={toggleMode}
-          tabIndex={profileVisible ? 0 : -1}
           className="flex items-center gap-1.5 rounded-xl px-2 py-1.5 outline-none transition-colors hover:bg-[color:var(--ui-accent-soft)] focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-label={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
@@ -162,8 +131,7 @@ export function TopNav() {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              tabIndex={profileVisible ? 0 : -1}
-              className="flex items-center gap-2 rounded-xl px-2 py-1.5 outline-none transition-colors hover:bg-[color:var(--ui-accent-soft)] focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="flex items-center gap-2 rounded-xl px-2 py-1.5 outline-none transition-colors hover:bg-[color:var(--ui-accent-soft)] focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               aria-label="Theme"
             >
               <Palette className="h-4 w-4 text-stone-600" />
@@ -208,7 +176,7 @@ export function TopNav() {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              tabIndex={profileVisible ? 0 : -1}
+                  aria-label="Account menu"
               className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 outline-none transition-colors hover:bg-[color:var(--ui-accent-soft)] focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <Avatar>

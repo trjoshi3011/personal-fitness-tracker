@@ -1,5 +1,11 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
+
+import { Textarea } from "@/components/ui/textarea";
+
+
 import * as React from "react";
 import { ClipboardList, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -248,7 +254,7 @@ export function TrainingContextPanel() {
   if (collapsed) {
     if (!ready) return null;
     return (
-      <button
+      <Button variant="outline"
         type="button"
         onClick={() => {
           setPanel((prev) => {
@@ -260,12 +266,12 @@ export function TrainingContextPanel() {
           });
           setCollapsed(false);
         }}
-        className="fixed right-5 bottom-20 z-40 inline-flex items-center gap-2 rounded-full border border-[color:var(--color-border-default)] bg-card px-4 py-2 text-sm font-medium text-[color:var(--color-text-primary)] shadow-md transition-colors hover:bg-[color:var(--ui-accent-soft)]"
+        className="fixed right-5 bottom-20 z-40 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors"
       >
         <ClipboardList className="h-4 w-4 text-[color:var(--ui-accent)]" />
         Plan context
         <ChevronUp className="h-4 w-4 text-[color:var(--color-text-tertiary)]" />
-      </button>
+      </Button>
     );
   }
 
@@ -291,23 +297,23 @@ export function TrainingContextPanel() {
             </p>
           </div>
         </div>
-        <button
+        <Button variant="outline"
           type="button"
           onClick={() => setCollapsed(true)}
-          className="inline-flex h-8 items-center gap-1 rounded-lg border border-[color:var(--color-border-default)] bg-[color:color-mix(in_srgb,var(--background)_60%,transparent)] px-2 text-xs font-medium text-[color:var(--color-text-secondary)] transition-colors hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)]"
+          className="inline-flex h-8 items-center gap-1 px-2 text-xs font-medium transition-colors"
           aria-label="Collapse plan context panel"
         >
           <ChevronDown className="h-3.5 w-3.5" />
           Collapse
-        </button>
+        </Button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col px-4 py-3">
-        <textarea
+        <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="e.g. sore left IT band — keep easy runs only; cap long run at 8 mi this block."
-          className="min-h-0 flex-1 resize-none rounded-xl border border-[color:var(--color-border-default)] bg-[color:color-mix(in_srgb,var(--color-bg-surface)_78%,transparent)] p-3 text-sm leading-relaxed text-[color:var(--color-text-primary)] outline-none focus:border-[color:var(--ui-accent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+          className="min-h-0 flex-1 resize-none p-3 text-sm leading-relaxed"
           maxLength={4000}
           spellCheck
         />

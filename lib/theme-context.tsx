@@ -60,6 +60,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useIsomorphicLayoutEffect(() => {
     const domTheme = readDomTheme();
     const domMode = readDomMode();
+    document.documentElement.setAttribute("data-theme", domTheme);
+    document.documentElement.setAttribute("data-mode", domMode);
     setThemeRaw(domTheme);
     setModeRaw(domMode);
     // Belt-and-suspenders: ensure localStorage has the active values too,

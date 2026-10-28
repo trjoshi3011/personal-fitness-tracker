@@ -1,5 +1,8 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
+
 import * as React from "react";
 import { Sparkles, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { useUserTimezone } from "@/components/providers/user-timezone-provider";
@@ -142,11 +145,11 @@ export function AiInsights() {
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <button
+          <Button variant="outline"
             type="button"
             onClick={generate}
             disabled={generating || cacheLoading}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[color:var(--color-border-default)] bg-[color:color-mix(in_srgb,var(--background)_60%,transparent)] px-3 text-xs font-medium text-[color:var(--color-text-secondary)] transition-all hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)] disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium transition-all disabled:opacity-50"
           >
             <RefreshCw
               className={cn("h-3 w-3", generating && "animate-spin")}
@@ -156,12 +159,12 @@ export function AiInsights() {
               : result
                 ? "Regenerate"
                 : "Generate insights"}
-          </button>
+          </Button>
           {result && (
-            <button
+            <Button variant="outline"
               type="button"
               onClick={() => setCollapsed((c) => !c)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--color-text-tertiary)] transition-colors hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-secondary)]"
+              className="inline-flex h-8 w-8 items-center justify-center transition-colors"
               aria-label={collapsed ? "Expand insights" : "Collapse insights"}
             >
               {collapsed ? (
@@ -169,7 +172,7 @@ export function AiInsights() {
               ) : (
                 <ChevronUp className="h-4 w-4" />
               )}
-            </button>
+            </Button>
           )}
         </div>
       </div>

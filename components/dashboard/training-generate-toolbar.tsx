@@ -1,5 +1,8 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
+
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -61,15 +64,15 @@ export function TrainingGenerateToolbar({
         >
           Next 2 weeks
         </Link>
-        <button
+        <Button variant="outline"
           type="button"
           disabled={busy}
           onClick={() => void onGenerate()}
-          className="inline-flex items-center gap-1.5 rounded-md border border-[color:var(--color-border-default)] bg-[image:linear-gradient(90deg,var(--ui-accent-soft),var(--ui-accent-2-soft),var(--ui-accent-3-soft))] px-3 py-1 text-xs font-medium text-[color:var(--color-text-primary)] transition-colors hover:bg-[color:var(--ui-accent-soft)] disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium transition-colors disabled:opacity-60"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
           Generate / refresh plan
-        </button>
+        </Button>
       </div>
       {error ? (
         <p className="text-xs text-[color:color-mix(in_srgb,var(--ui-danger)_72%,var(--color-text-primary))]">

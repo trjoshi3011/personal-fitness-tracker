@@ -1,5 +1,8 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
+
+
 import { useMemo, useState } from "react";
 
 type ApiOk = { ok: true; miles: number; date: string };
@@ -45,11 +48,11 @@ export function MilesSinceDate() {
         <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
           Start date
         </div>
-        <input
+        <Input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+          className="h-10 w-full px-3 text-sm"
         />
         <button
           type="submit"

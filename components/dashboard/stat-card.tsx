@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -32,10 +33,6 @@ export function StatCard({
         className,
       )}
     >
-      <div
-        className="absolute left-0 top-0 h-full w-1 bg-[color:var(--ui-accent)]"
-        aria-hidden="true"
-      />
       <CardHeader className="shrink-0 pb-2 pl-6">
         <CardTitle className="text-xs font-medium tracking-wider text-[color:var(--color-text-tertiary)] uppercase">
           {title}
@@ -50,13 +47,13 @@ export function StatCard({
         )}
       >
         <div className="space-y-1">
-          <div className="text-2xl font-semibold tracking-tight text-[color:var(--color-text-primary)]">{value}</div>
+          <div className="text-3xl font-semibold tabular-nums tracking-tight text-[color:var(--color-text-primary)]">{value}</div>
           {hint ? (
             <div className="text-xs text-[color:var(--color-text-tertiary)]">{hint}</div>
           ) : null}
         </div>
         {trend ? (
-          <div className={cn("text-xs font-medium", tone)}>{trend.label}</div>
+          <Badge className={cn("bg-muted font-medium", tone)}>{trend.label}</Badge>
         ) : null}
       </CardContent>
     </Card>

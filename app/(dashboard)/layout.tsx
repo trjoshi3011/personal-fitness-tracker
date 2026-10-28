@@ -37,7 +37,7 @@ export default async function DashboardLayout({
           <Sidebar />
           <div className="relative flex min-w-0 flex-1 flex-col">
             <TopNav />
-            <main className="flex-1 px-4 py-8 md:px-8 md:pl-6">{children}</main>
+            <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 md:px-8 md:py-8">{children}</main>
           </div>
         </div>
       </div>

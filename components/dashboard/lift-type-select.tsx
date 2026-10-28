@@ -1,5 +1,8 @@
 "use client";
 
+import { NativeSelect } from "@/components/ui/native-select";
+
+
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -54,7 +57,7 @@ export function LiftTypeSelect({ initial, endpoint, className }: LiftTypeSelectP
 
   return (
     <div className={cn("relative inline-flex items-center", className)}>
-      <select
+      <NativeSelect
         value={value}
         disabled={busy}
         onChange={(e) => void commit(e.target.value)}
@@ -70,7 +73,7 @@ export function LiftTypeSelect({ initial, endpoint, className }: LiftTypeSelectP
             {LIFT_TEMPLATE_LABELS[t]}
           </option>
         ))}
-      </select>
+      </NativeSelect>
       {busy ? (
         <Loader2 className="pointer-events-none absolute right-2 h-3.5 w-3.5 animate-spin text-stone-400" />
       ) : null}

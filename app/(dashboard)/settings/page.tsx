@@ -1,3 +1,7 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
@@ -276,9 +280,9 @@ export default async function SettingsPage({
               </a>
               {isConnected ? (
                 <form action="/api/strava/sync?days=90" method="post">
-                  <button className="inline-flex h-9 items-center justify-center rounded-xl border border-[color:var(--color-border-default)] bg-card/75 px-4 text-sm font-medium text-[color:var(--color-text-secondary)] transition-all hover:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)]">
+                  <Button type="submit" variant="outline" className="inline-flex h-9 items-center justify-center px-4 text-sm font-medium transition-all">
                     Sync now
-                  </button>
+                  </Button>
                 </form>
               ) : null}
             </div>
@@ -349,9 +353,9 @@ export default async function SettingsPage({
                 </a>
                 {fitbitConnected ? (
                   <form action="/api/fitbit/sync?days=90" method="post">
-                    <button className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-900/15 bg-card/75 px-4 text-sm font-medium text-stone-700 transition-all hover:border-orange-500/40 hover:bg-orange-50/75 hover:text-orange-700">
+                    <Button type="submit" variant="outline" className="inline-flex h-9 items-center justify-center px-4 text-sm font-medium transition-all">
                       Sync now
-                    </button>
+                    </Button>
                   </form>
                 ) : null}
               </div>
@@ -429,9 +433,9 @@ export default async function SettingsPage({
                 </a>
                 {whoopConnected ? (
                   <form action="/api/whoop/sync?days=90" method="post">
-                    <button className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-900/15 bg-card/75 px-4 text-sm font-medium text-stone-700 transition-all hover:border-orange-500/40 hover:bg-orange-50/75 hover:text-orange-700">
+                    <Button type="submit" variant="outline" className="inline-flex h-9 items-center justify-center px-4 text-sm font-medium transition-all">
                       Sync now
-                    </button>
+                    </Button>
                   </form>
                 ) : null}
               </div>
@@ -508,32 +512,32 @@ export default async function SettingsPage({
             <div className="mt-3 flex flex-wrap gap-2">
               {isConnected ? (
                 <form action="/api/strava/sync?days=1095" method="post">
-                  <button
+                  <Button variant="outline"
                     type="submit"
-                    className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-900/20 bg-amber-50/80 px-3 text-xs font-medium text-stone-800 transition-all hover:border-orange-500/40 hover:bg-amber-50"
+                    className="inline-flex h-9 items-center justify-center px-3 text-xs font-medium transition-all"
                   >
                     Strava · ~3 years
-                  </button>
+                  </Button>
                 </form>
               ) : null}
               {fitbitConnected ? (
                 <form action="/api/fitbit/sync?days=183" method="post">
-                  <button
+                  <Button variant="outline"
                     type="submit"
-                    className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-900/20 bg-amber-50/80 px-3 text-xs font-medium text-stone-800 transition-all hover:border-orange-500/40 hover:bg-amber-50"
+                    className="inline-flex h-9 items-center justify-center px-3 text-xs font-medium transition-all"
                   >
                     Fitbit · ~6 months
-                  </button>
+                  </Button>
                 </form>
               ) : null}
               {whoopConnected ? (
                 <form action="/api/whoop/sync?days=180&full=1" method="post">
-                  <button
+                  <Button variant="outline"
                     type="submit"
-                    className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-900/20 bg-amber-50/80 px-3 text-xs font-medium text-stone-800 transition-all hover:border-orange-500/40 hover:bg-amber-50"
+                    className="inline-flex h-9 items-center justify-center px-3 text-xs font-medium transition-all"
                   >
                     WHOOP · ~6 months
-                  </button>
+                  </Button>
                 </form>
               ) : null}
             </div>
@@ -557,51 +561,51 @@ export default async function SettingsPage({
             method="post"
             className="mt-4 grid gap-3 sm:grid-cols-3"
           >
-            <label className="block">
+            <Label className="block">
               <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                 Max HR (bpm)
               </div>
-              <input
+              <Input
                 name="hrMaxBpm"
                 type="number"
                 min={120}
                 max={230}
                 placeholder="e.g. 190"
                 defaultValue={user?.hrMaxBpm ?? ""}
-                className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                className="mt-1 h-10 w-full px-3 text-sm"
               />
-            </label>
-            <label className="block">
+            </Label>
+            <Label className="block">
               <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                 Resting HR (bpm)
               </div>
-              <input
+              <Input
                 name="hrRestBpm"
                 type="number"
                 min={30}
                 max={110}
                 placeholder="optional"
                 defaultValue={user?.hrRestBpm ?? ""}
-                className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                className="mt-1 h-10 w-full px-3 text-sm"
               />
-            </label>
-            <label className="block">
+            </Label>
+            <Label className="block">
               <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                 Zone scheme
               </div>
-              <select
+              <NativeSelect
                 name="hrZoneScheme"
                 defaultValue={user?.hrZoneScheme ?? "percent_max"}
-                className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                className="mt-1 h-10 w-full px-3 text-sm"
               >
                 <option value="percent_max">Percent of max HR (50/60/70/80/90)</option>
                 <option value="percent_threshold">Percent of threshold HR</option>
-              </select>
-            </label>
+              </NativeSelect>
+            </Label>
             <div className="sm:col-span-3">
-              <button className="inline-flex h-10 items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800">
+              <Button type="submit" variant="default" className="inline-flex h-10 items-center justify-center px-4 text-sm font-medium transition-colors">
                 Save HR profile
-              </button>
+              </Button>
               <span className="ml-3 text-xs text-stone-500">
                 Saving recomputes cached zones for your runs.
               </span>
@@ -618,64 +622,64 @@ export default async function SettingsPage({
           <CardContent>
             <form action="/api/settings/profile" method="post" className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="block">
+                <Label className="block">
                   <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                     First name
                   </div>
-                  <input
+                  <Input
                     name="firstName"
                     required
                     defaultValue={user?.firstName ?? ""}
-                    className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                    className="mt-1 h-10 w-full px-3 text-sm"
                   />
-                </label>
-                <label className="block">
+                </Label>
+                <Label className="block">
                   <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                     Last name
                   </div>
-                  <input
+                  <Input
                     name="lastName"
                     required
                     defaultValue={user?.lastName ?? ""}
-                    className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                    className="mt-1 h-10 w-full px-3 text-sm"
                   />
-                </label>
+                </Label>
               </div>
 
-              <label className="block">
+              <Label className="block">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Email
                 </div>
-                <input
+                <Input
                   name="email"
                   type="email"
                   required
                   defaultValue={user?.email ?? ""}
-                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 />
-              </label>
+              </Label>
 
-              <label className="block">
+              <Label className="block">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Timezone
                 </div>
-                <select
+                <NativeSelect
                   name="timezone"
                   required
                   defaultValue={user?.timezone ?? "UTC"}
-                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 >
                   {timezones.map((tz) => (
                     <option key={tz.value} value={tz.value}>
                       {tz.label}
                     </option>
                   ))}
-                </select>
-              </label>
+                </NativeSelect>
+              </Label>
 
-              <button className="inline-flex h-10 items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800">
+              <Button type="submit" variant="default" className="inline-flex h-10 items-center justify-center px-4 text-sm font-medium transition-colors">
                 Save profile
-              </button>
+              </Button>
             </form>
           </CardContent>
         </Card>
@@ -686,51 +690,51 @@ export default async function SettingsPage({
           </CardHeader>
           <CardContent>
             <form action="/api/settings/password" method="post" className="space-y-3">
-              <label className="block">
+              <Label className="block">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Current password
                 </div>
-                <input
+                <Input
                   name="currentPassword"
                   type="password"
                   required
-                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 />
-              </label>
+              </Label>
 
-              <label className="block">
+              <Label className="block">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   New password
                 </div>
-                <input
+                <Input
                   name="newPassword"
                   type="password"
                   minLength={8}
                   required
-                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 />
-              </label>
+              </Label>
 
-              <label className="block">
+              <Label className="block">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Confirm new password
                 </div>
-                <input
+                <Input
                   name="confirmPassword"
                   type="password"
                   minLength={8}
                   required
-                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 />
-              </label>
+              </Label>
 
               <p className="text-xs text-stone-500">
                 Changing your password will sign you out from all devices.
               </p>
 
-              <button className="inline-flex h-10 items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800">
+              <Button type="submit" variant="default" className="inline-flex h-10 items-center justify-center px-4 text-sm font-medium transition-colors">
                 Update password
-              </button>
+              </Button>
             </form>
           </CardContent>
         </Card>

@@ -1,3 +1,7 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Label } from "@/components/ui/label";
 import "server-only";
 import Link from "next/link";
 
@@ -543,19 +547,19 @@ export async function NutritionBelowFold({
               method="post"
               className="grid gap-3 sm:grid-cols-2"
             >
-              <label className="block sm:col-span-2">
+              <Label className="block sm:col-span-2">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Date
                 </div>
-                <input
+                <Input
                   name="date"
                   type="date"
                   required
                   defaultValue={todayIso}
                   max={todayIso}
-                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 />
-              </label>
+              </Label>
               <NumberField name="caloriesKcal" label="Calories (kcal)" placeholder="e.g. 2400" max={20000} />
               <NumberField name="proteinG" label="Protein (g)" placeholder="e.g. 175" max={1000} />
               <NumberField name="carbsG" label="Carbs (g)" placeholder="e.g. 280" max={2000} />
@@ -564,22 +568,22 @@ export async function NutritionBelowFold({
               <NumberField name="sugarG" label="Sugar (g)" placeholder="optional" max={2000} />
               <NumberField name="sodiumMg" label="Sodium (mg)" placeholder="optional" max={20000} />
               <NumberField name="saturatedFatG" label="Saturated fat (g)" placeholder="optional" max={500} />
-              <label className="block sm:col-span-2">
+              <Label className="block sm:col-span-2">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Notes (optional)
                 </div>
-                <input
+                <Input
                   name="notes"
                   type="text"
                   maxLength={280}
                   placeholder="e.g. cut day, post-race refeed"
-                  className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 />
-              </label>
+              </Label>
               <div className="sm:col-span-2 flex items-center gap-3">
-                <button className="inline-flex h-10 items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800">
+                <Button type="submit" variant="default" className="inline-flex h-10 items-center justify-center px-4 text-sm font-medium transition-colors">
                   Save day
-                </button>
+                </Button>
                 <span className="text-xs text-stone-500">
                   Empty fields are saved as null. Only fill in what you tracked.
                 </span>
@@ -634,8 +638,8 @@ export async function NutritionBelowFold({
                     </div>
                     {row.source === "MANUAL" ? (
                       <form action="/api/nutrition/manual" method="post">
-                        <input type="hidden" name="_action" value="delete" />
-                        <input type="hidden" name="id" value={row.id} />
+                        <Input type="hidden" name="_action" value="delete" />
+                        <Input type="hidden" name="id" value={row.id} />
                         <button
                           type="submit"
                           className="text-xs font-medium text-stone-500 hover:text-[color:var(--ui-danger)]"
@@ -676,20 +680,20 @@ function NumberField({
   max: number;
 }) {
   return (
-    <label className="block">
+    <Label className="block">
       <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
         {label}
       </div>
-      <input
+      <Input
         name={name}
         type="number"
         step="any"
         min="0"
         max={max}
         placeholder={placeholder}
-        className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+        className="mt-1 h-10 w-full px-3 text-sm"
       />
-    </label>
+    </Label>
   );
 }
 
@@ -742,12 +746,12 @@ function ProfileCard({
         method="post"
         className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
       >
-        <label className="block">
+        <Label className="block">
           <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
             Height
           </div>
           <div className="mt-1 flex gap-2">
-            <input
+            <Input
               name="height"
               type="number"
               step="0.1"
@@ -755,59 +759,59 @@ function ProfileCard({
               max="260"
               placeholder="e.g. 178"
               defaultValue={profile.heightCm ?? ""}
-              className="h-10 flex-1 rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+              className="h-10 flex-1 px-3 text-sm"
             />
-            <select
+            <NativeSelect
               name="heightUnit"
               defaultValue="cm"
-              className="h-10 rounded-xl border border-amber-950/15 bg-card px-2 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+              className="h-10 px-2 text-sm"
             >
               <option value="cm">cm</option>
               <option value="in">in</option>
-            </select>
+            </NativeSelect>
           </div>
           {heightInches != null ? (
             <p className="mt-1 text-[11px] text-stone-500">
               ≈ {heightInches.toFixed(1)} in
             </p>
           ) : null}
-        </label>
+        </Label>
 
-        <label className="block">
+        <Label className="block">
           <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
             Date of birth
           </div>
-          <input
+          <Input
             name="dateOfBirth"
             type="date"
             defaultValue={dobIso}
-            className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+            className="mt-1 h-10 w-full px-3 text-sm"
           />
-        </label>
+        </Label>
 
-        <label className="block">
+        <Label className="block">
           <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
             Biological sex
           </div>
-          <select
+          <NativeSelect
             name="biologicalSex"
             defaultValue={profile.biologicalSex ?? ""}
-            className="mt-1 h-10 w-full rounded-xl border border-amber-950/15 bg-card px-3 text-sm text-stone-900 outline-none focus:border-orange-500/40 focus:ring-2 focus:ring-orange-500/25"
+            className="mt-1 h-10 w-full px-3 text-sm"
           >
             <option value="">Not set</option>
             <option value="MALE">Male</option>
             <option value="FEMALE">Female</option>
             <option value="OTHER">Other</option>
-          </select>
+          </NativeSelect>
           <p className="mt-1 text-[11px] text-stone-500">
             Used by Mifflin–St Jeor.
           </p>
-        </label>
+        </Label>
 
         <div className="flex items-end">
-          <button className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-medium text-white transition-colors hover:bg-stone-800">
+          <Button type="submit" variant="default" className="inline-flex h-10 w-full items-center justify-center px-4 text-sm font-medium transition-colors">
             Save profile
-          </button>
+          </Button>
         </div>
       </form>
     </details>

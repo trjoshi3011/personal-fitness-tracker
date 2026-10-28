@@ -1,3 +1,4 @@
+import { Input } from "@/components/ui/input";
 import { ChartCard } from "@/components/dashboard/chart-card";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { ActivityMonthCalendar } from "@/components/dashboard/activity-month-calendar";
@@ -303,11 +304,11 @@ export default async function RunningPage({
               <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                 New shoes date
               </div>
-              <input
+              <Input
                 type="date"
                 name="shoeStartDate"
                 defaultValue={shoeStart ? toDateInputValue(shoeStart, tz) : ""}
-                className="h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+                className="h-10 w-full px-3 text-sm"
               />
               <button
                 type="submit"

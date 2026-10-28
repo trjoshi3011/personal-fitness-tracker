@@ -1,0 +1,16 @@
+/* Navigation blends into the canvas and recedes without shifting the content. */
+.chrome {
+  opacity: 1;
+  transition: opacity 320ms ease, background-color 320ms ease;
+}
+.header {
+  background: color-mix(in srgb, var(--background) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+.header[data-faded="true"] { opacity: 0; }
+.chrome[data-faded="true"]:hover,
+.chrome[data-faded="true"]:focus-within,
+.chrome[data-faded="true"]:has([data-state="open"]) { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .chrome { transition: none; }
+}

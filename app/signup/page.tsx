@@ -1,14 +1,19 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Label } from "@/components/ui/label";
 import Link from "next/link";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getTimezones } from "@/lib/timezones";
 
-export default function SignupPage({
+export default async function SignupPage({
   searchParams,
 }: {
-  searchParams?: { next?: string; error?: string };
+  searchParams?: Promise<{ next?: string; error?: string }>;
 }) {
-  const next = searchParams?.next ?? "/overview";
+  const params = await searchParams;
+  const next = params?.next ?? "/overview";
   const timezones = getTimezones();
   const defaultTimezone =
     Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -33,64 +38,64 @@ export default function SignupPage({
             <CardTitle>Account</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {searchParams?.error ? (
+            {params?.error ? (
               <div className="rounded-xl border border-rose-500/20 bg-rose-50/60 p-3 text-sm text-rose-700">
-                {searchParams.error}
+                {params.error}
               </div>
             ) : null}
 
             <form action="/api/auth/signup" method="post" className="space-y-3">
-              <input type="hidden" name="next" value={next} />
+              <Input type="hidden" name="next" value={next} />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="block">
+                <Label className="block">
                   <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                     First name
                   </div>
-                  <input
+                  <Input
                     name="firstName"
                     required
-                    className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+                    className="mt-1 h-10 w-full px-3 text-sm"
                   />
-                </label>
-                <label className="block">
+                </Label>
+                <Label className="block">
                   <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                     Last name
                   </div>
-                  <input
+                  <Input
                     name="lastName"
                     required
-                    className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+                    className="mt-1 h-10 w-full px-3 text-sm"
                   />
-                </label>
+                </Label>
               </div>
-              <label className="block">
+              <Label className="block">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Email
                 </div>
-                <input
+                <Input
                   name="email"
                   type="email"
                   required
-                  className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 />
-              </label>
-              <label className="block">
+              </Label>
+              <Label className="block">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Password
                 </div>
-                <input
+                <Input
                   name="password"
                   type="password"
                   required
                   minLength={8}
-                  className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 />
-              </label>
-              <label className="block">
+              </Label>
+              <Label className="block">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Timezone
                 </div>
-                <select
+                <NativeSelect
                   name="timezone"
                   required
                   defaultValue={
@@ -98,18 +103,18 @@ export default function SignupPage({
                       ? defaultTimezone
                       : "UTC"
                   }
-                  className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 >
                   {timezones.map((tz) => (
                     <option key={tz.value} value={tz.value}>
                       {tz.label}
                     </option>
                   ))}
-                </select>
-              </label>
-              <button className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-[color:var(--ui-accent)] px-4 text-sm font-medium text-[color:var(--color-text-inverse)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--ui-accent)_88%,#000)]">
+                </NativeSelect>
+              </Label>
+              <Button type="submit" className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-[color:var(--ui-accent)] px-4 text-sm font-medium text-[color:var(--color-text-inverse)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--ui-accent)_88%,#000)]">
                 Create account
-              </button>
+              </Button>
             </form>
 
             <div className="text-sm text-stone-600">

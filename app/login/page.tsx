@@ -1,19 +1,23 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import Link from "next/link";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
-  searchParams?: {
+  searchParams?: Promise<{
     next?: string;
     error?: string;
     forgot?: string;
     reason?: string;
     password?: string;
-  };
+  }>;
 }) {
-  const next = searchParams?.next ?? "/overview";
+  const params = await searchParams;
+  const next = params?.next ?? "/overview";
 
   return (
     <div className="dashboard-bg min-h-dvh px-6 py-14">
@@ -35,54 +39,54 @@ export default function LoginPage({
             <CardTitle>Account</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {searchParams?.error ? (
+            {params?.error ? (
               <div className="rounded-xl border border-rose-500/20 bg-rose-50/60 p-3 text-sm text-rose-700">
-                {searchParams.error}
+                {params.error}
               </div>
             ) : null}
-            {searchParams?.forgot === "ok" ? (
+            {params?.forgot === "ok" ? (
               <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/60 p-3 text-sm text-emerald-700">
-                {searchParams.reason ?? "Password reset complete. Please log in."}
+                {params.reason ?? "Password reset complete. Please log in."}
               </div>
             ) : null}
-            {searchParams?.forgot === "error" ? (
+            {params?.forgot === "error" ? (
               <div className="rounded-xl border border-rose-500/20 bg-rose-50/60 p-3 text-sm text-rose-700">
-                {searchParams.reason ?? "Could not reset password."}
+                {params.reason ?? "Could not reset password."}
               </div>
             ) : null}
-            {searchParams?.password === "updated" ? (
+            {params?.password === "updated" ? (
               <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/60 p-3 text-sm text-emerald-700">
                 Password changed successfully. Log in with your new password.
               </div>
             ) : null}
 
             <form action="/api/auth/login" method="post" className="space-y-3">
-              <input type="hidden" name="next" value={next} />
-              <label className="block">
+              <Input type="hidden" name="next" value={next} />
+              <Label className="block">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Email
                 </div>
-                <input
+                <Input
                   name="email"
                   type="email"
                   required
-                  className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 />
-              </label>
-              <label className="block">
+              </Label>
+              <Label className="block">
                 <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                   Password
                 </div>
-                <input
+                <Input
                   name="password"
                   type="password"
                   required
-                  className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+                  className="mt-1 h-10 w-full px-3 text-sm"
                 />
-              </label>
-              <button className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-[color:var(--ui-accent)] px-4 text-sm font-medium text-[color:var(--color-text-inverse)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--ui-accent)_88%,#000)]">
+              </Label>
+              <Button type="submit" className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-[color:var(--ui-accent)] px-4 text-sm font-medium text-[color:var(--color-text-inverse)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--ui-accent)_88%,#000)]">
                 Log in
-              </button>
+              </Button>
             </form>
 
             <div className="text-sm text-stone-600">
@@ -104,44 +108,44 @@ export default function LoginPage({
                 method="post"
                 className="mt-3 space-y-3"
               >
-                <label className="block">
+                <Label className="block">
                   <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                     Email
                   </div>
-                  <input
+                  <Input
                     name="email"
                     type="email"
                     required
-                    className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+                    className="mt-1 h-10 w-full px-3 text-sm"
                   />
-                </label>
-                <label className="block">
+                </Label>
+                <Label className="block">
                   <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                     New password
                   </div>
-                  <input
+                  <Input
                     name="password"
                     type="password"
                     minLength={8}
                     required
-                    className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+                    className="mt-1 h-10 w-full px-3 text-sm"
                   />
-                </label>
-                <label className="block">
+                </Label>
+                <Label className="block">
                   <div className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">
                     Confirm new password
                   </div>
-                  <input
+                  <Input
                     name="confirmPassword"
                     type="password"
                     minLength={8}
                     required
-                    className="mt-1 h-10 w-full rounded-xl border border-[color:var(--color-border-default)] bg-card px-3 text-sm text-[color:var(--color-text-primary)] outline-none focus:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] focus:ring-2 focus:ring-[color:var(--ring)]"
+                    className="mt-1 h-10 w-full px-3 text-sm"
                   />
-                </label>
-                <button className="inline-flex h-9 items-center justify-center rounded-xl border border-[color:var(--color-border-default)] bg-card/70 px-3 text-sm font-medium text-[color:var(--color-text-secondary)] transition-all hover:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)]">
+                </Label>
+                <Button type="submit" className="inline-flex h-9 items-center justify-center rounded-xl border border-[color:var(--color-border-default)] bg-card/70 px-3 text-sm font-medium text-[color:var(--color-text-secondary)] transition-all hover:border-[color:color-mix(in_srgb,var(--ui-accent)_45%,transparent)] hover:bg-[color:var(--ui-accent-soft)] hover:text-[color:var(--color-text-primary)]">
                   Reset password
-                </button>
+                </Button>
               </form>
             </details>
           </CardContent>

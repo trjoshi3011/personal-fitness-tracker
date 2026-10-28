@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { ChartCard } from "@/components/dashboard/chart-card";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { ActivityMonthCalendar } from "@/components/dashboard/activity-month-calendar";
@@ -382,37 +383,37 @@ export default async function LiftingPage({
           contentClassName="pt-0"
         >
           <div className="overflow-x-auto">
-            <table className="w-full border-separate border-spacing-0 text-sm">
-              <thead className="text-[10px] tracking-wider text-stone-500 uppercase">
-                <tr>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">Start</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">
+            <Table className="w-full border-separate border-spacing-0 text-sm">
+              <TableHeader className="text-[10px] tracking-wider text-stone-500 uppercase">
+                <TableRow>
+                  <TableHead className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">Start</TableHead>
+                  <TableHead className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">
                     Session type
-                  </th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">Sport</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Duration</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">Score</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Strain</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Avg HR</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Max HR</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">kJ</th>
-                  <th className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Z4–5</th>
-                </tr>
-              </thead>
-              <tbody>
+                  </TableHead>
+                  <TableHead className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">Sport</TableHead>
+                  <TableHead className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Duration</TableHead>
+                  <TableHead className="sticky top-0 bg-card/85 px-3 py-2.5 text-left font-medium">Score</TableHead>
+                  <TableHead className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Strain</TableHead>
+                  <TableHead className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Avg HR</TableHead>
+                  <TableHead className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Max HR</TableHead>
+                  <TableHead className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">kJ</TableHead>
+                  <TableHead className="sticky top-0 bg-card/85 px-3 py-2.5 text-right font-medium">Z4–5</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {tableRows.length > 0 ? (
                   tableRows.map((w) => {
                     const sec = (w.endAt.getTime() - w.startAt.getTime()) / 1000;
                     const isWhoop = w.source === "WHOOP";
                     return (
-                      <tr
+                      <TableRow
                         key={`${w.source}:${w.id}`}
                         className="border-t border-[color:var(--color-border-subtle)] transition-colors hover:bg-[color:var(--ui-accent-soft)]"
                       >
-                        <td className="whitespace-nowrap px-3 py-2.5 text-stone-500">
+                        <TableCell className="whitespace-nowrap px-3 py-2.5 text-stone-500">
                           {formatZonedDateTimeLiftingCell(w.startAt, tz)}
-                        </td>
-                        <td className="px-3 py-2.5 align-middle">
+                        </TableCell>
+                        <TableCell className="px-3 py-2.5 align-middle">
                           <LiftTypeSelect
                             initial={w.liftSessionTemplate}
                             endpoint={
@@ -421,8 +422,8 @@ export default async function LiftingPage({
                                 : `/api/strava-activities/${w.id}/lift-template`
                             }
                           />
-                        </td>
-                        <td className="px-3 py-2.5">
+                        </TableCell>
+                        <TableCell className="px-3 py-2.5">
                           <span
                             className={
                               isWhoop
@@ -435,39 +436,39 @@ export default async function LiftingPage({
                           <div className="mt-0.5 font-medium text-[color:var(--color-text-primary)]">
                             {formatSportLabel(w.sportName)}
                           </div>
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
                           {sec > 0 ? secondsToHhMm(Math.round(sec)) : "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-stone-600">{w.scoreState}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap px-3 py-2.5 text-stone-600">{w.scoreState}</TableCell>
+                        <TableCell className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
                           {w.strain != null ? w.strain.toFixed(2) : "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
                           {w.averageHeartRateBpm ?? "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
                           {w.maxHeartRateBpm ?? "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
                           {w.kilojoule != null ? Math.round(w.kilojoule) : "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap px-3 py-2.5 text-right text-stone-700">
                           {zoneHighMinutes(w.zoneDurations)}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     );
                   })
                 ) : (
-                  <tr>
-                    <td colSpan={10} className="px-3 py-6 text-center text-stone-500">
+                  <TableRow>
+                    <TableCell colSpan={10} className="px-3 py-6 text-center text-stone-500">
                       No lifting workouts in the last 30 days. Log a strength session on WHOOP (sport
                       weightlifting / powerlifting / etc.) and sync.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </ChartCard>
       </section>
