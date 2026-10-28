@@ -6,9 +6,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
- * Cron entrypoint. Expected to be hit on a ~30 minute cadence by Vercel Cron
- * (see `vercel.json`) or any external scheduler. Triggers Strava + WHOOP sync
- * once per user per local day, at the end of their day (hour 23 in their tz).
+ * Daily cron entrypoint, compatible with Vercel Hobby (see `vercel.json`).
+ * Triggers Strava + WHOOP sync for connected users in every timezone, skipping
+ * providers that already successfully synced during the user's local day.
  *
  * Auth: requires `CRON_SECRET` env var. Vercel Cron sends it automatically as
  * `Authorization: Bearer <CRON_SECRET>`. For manual / external use, send the

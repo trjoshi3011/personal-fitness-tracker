@@ -7,16 +7,10 @@ import { normalizeUserTimezone } from "@/lib/user-timezone";
 import { startOfZonedCalendarDay } from "@/lib/zoned-calendar";
 
 /**
- * Auto-sync runs once at end of each user's local calendar day (hour 23 in
- * their IANA timezone). A user is "due" when:
- *   1. Their local time is currently in hour 23 (handles 30 / 45 min offsets).
- *   2. They have an active STRAVA or WHOOP `ConnectedAccount`.
- *   3. No `SUCCESS` `SyncLog` exists for that provider since the start of their
- *      local calendar day.
- *
- * The external cron (see `vercel.json` / any scheduler) is expected to invoke
- * this every ~30 minutes — the local-hour-23 check plus the same-day SyncLog
- * dedupe ensures each user gets exactly one auto-sync per local day.
+ * Vercel Hobby invokes this once daily (see vercel.json). Every user with an
+ * active STRAVA or WHOOP account is eligible, regardless of their local hour.
+ * A successful provider SyncLog since the start of the user's local calendar
+ * day suppresses duplicate work, including after a manual sync.
  */
 
 /** A small lookback covers any retroactive edits without re-pulling years. */
@@ -31,9 +25,6 @@ function localTimeParts(d: Date, tz: string) {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
   }).formatToParts(d);
   const n = (t: Intl.DateTimeFormatPartTypes) =>
     Number(parts.find((p) => p.type === t)?.value);
@@ -41,8 +32,6 @@ function localTimeParts(d: Date, tz: string) {
     y: n("year"),
     m: n("month"),
     d: n("day"),
-    h: n("hour"),
-    min: n("minute"),
   };
 }
 
@@ -58,19 +47,14 @@ export type AutoSyncRunResult = {
   }>;
   skipped: Array<{
     userId: string;
-    reason:
-      | "not-in-23h-window"
-      | "already-synced-today"
-      | "provider-not-connected";
+    reason: "already-synced-today" | "provider-not-connected";
     provider?: AutoSyncProvider;
-    localHour?: number;
   }>;
 };
 
 /**
  * Scan all users with at least one active STRAVA/WHOOP account and trigger
- * auto-sync for those whose local time is currently at the end of the day and
- * who have not yet successfully synced for that local calendar day.
+ * auto-sync for providers not yet successfully synced that local calendar day.
  *
  * Caller is responsible for auth (e.g. cron secret). Throws on infrastructure
  * errors but never on per-user failures — those are recorded in `triggered`.
@@ -109,18 +93,6 @@ export async function runAutoSyncForDueUsers(
   for (const user of users) {
     const tz = normalizeUserTimezone(user.timezone);
     const local = localTimeParts(now, tz);
-
-    // We only fire during the last hour of the user's local day. Combined with
-    // a ~30-minute cron cadence this still hits every IANA timezone (incl. the
-    // 30 / 45 min offsets) before midnight.
-    if (local.h !== 23) {
-      result.skipped.push({
-        userId: user.id,
-        reason: "not-in-23h-window",
-        localHour: local.h,
-      });
-      continue;
-    }
 
     const localDayStart = startOfZonedCalendarDay(local.y, local.m, local.d, tz);
 

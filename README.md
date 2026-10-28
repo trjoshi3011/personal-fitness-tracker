@@ -34,3 +34,16 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Daily automatic sync
+
+`vercel.json` schedules `/api/cron/auto-sync` once daily at `0 7 * * *`
+(07:00 UTC), compatible with the Vercel Hobby plan. Hobby execution can occur
+anywhere in the scheduled hour, so this is not an exact local-time guarantee.
+Set `CRON_SECRET` in the Vercel project's environment variables; Vercel sends
+it as the bearer token when invoking the route.
+
+The job syncs active Strava and WHOOP accounts with a 14-day lookback. It skips
+providers that already successfully synced since the start of the user's local
+calendar day. Manual sync remains available. Automatic sync runs on a shared
+UTC schedule rather than at 11 p.m. in each user's timezone.
